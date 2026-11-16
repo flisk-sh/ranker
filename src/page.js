@@ -241,6 +241,7 @@ ${line('TRENDING RANK', cols.map((c) => '#' + c.rank + ' today'), kc)}${line('ST
 // Live mentions need Flisk Grow. The page has its whole design; every part that needs Grow says "Coming soon".
 export function mentionItems(ments, products) { return ments.map((m) => { const p = products.find((r) => r.slug === m.slug); return { at: m.at, source: m.source, slug: m.slug, html: mrow(m, p || m.slug) }; }); }
 export function live(rows = [], ments = [], total = 0) {
+  { const seen = new Set(); ments = ments.filter((m) => { const k = m.slug + '|' + String(m.text || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 60); if (seen.has(k)) return false; seen.add(k); return true; }); }
   const cnt = {}; for (const m of ments) cnt[m.slug] = (cnt[m.slug] || 0) + 1;
   const bySrc = {}; for (const m of ments) bySrc[m.source] = (bySrc[m.source] || 0) + 1;
   const KEY = { 'Hacker News': 'hn', Bluesky: 'bluesky' };
