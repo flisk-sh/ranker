@@ -1,5 +1,5 @@
 name: seed-trendshift
-# Every hour: add the repos Trendshift lists to ranker.flisk.si. Already listed repos are skipped by the API.
+# Every hour: add the repos Trendshift lists and the top repos in unusual languages to ranker.flisk.si. Already listed repos are skipped by the API.
 on:
   schedule:
     - cron: '17 * * * *'
@@ -17,3 +17,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun scripts/trendshift.mjs
+      - run: bun scripts/languages.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

@@ -14,11 +14,11 @@ Products ranked by stars gained on GitHub, each with a live README badge.
 [![Flisk Ranker](https://ranker.flisk.si/badge/<slug>.svg)](https://ranker.flisk.si/p/<slug>)
 ```
 
-Options: `?period=daily|weekly|monthly|yearly`, `?size=small`.
+Options: `?period=daily|weekly|monthly|yearly`, `?size=small`, `?scope=language` (rank among products in the same language, "#1 in Starlark today").
 
 ## Logos and seeding
 
-Each product shows its GitHub owner's avatar (letter tile if it fails to load). The `seed-trendshift` workflow runs hourly and submits every repo listed on trendshift.io (`bun scripts/trendshift.mjs`); repos already listed are skipped.
+Each product shows its GitHub owner's avatar (letter tile if it fails to load). The `seed-trendshift` workflow runs hourly and submits every repo listed on trendshift.io (`bun scripts/trendshift.mjs`); repos already listed are skipped. It also runs `scripts/languages.mjs`, which adds the top repos in unusual languages (Starlark, Lobster, Zig, Gleam, ...) plus `block/goose`, one slice of the language list per hour.
 
 ## Develop
 

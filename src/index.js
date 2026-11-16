@@ -78,6 +78,10 @@ export async function handle(req, env, deps = {}) {
     const d = await load(env, today);
     const row = ranked(d, period, today).find((r) => r.slug === m[1]);
     if (!row) return svg(badgeSvg({ size, label: 'Not listed yet' }));
+    if (u.searchParams.get('scope') === 'language' && row.language) {
+      const peers = ranked(d, period, today).filter((r) => r.language === row.language);
+      return svg(badgeSvg({ rank: peers.findIndex((r) => r.slug === row.slug) + 1, stars: row.stars, period, size, lang: row.language }));
+    }
     return svg(badgeSvg({ rank: row.rank, stars: row.stars, period, size }));
   }
 

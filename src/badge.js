@@ -43,10 +43,10 @@ const STARS = [[70, 9, 0.8, 3], [118, 47, 0.7, 2.4], [176, 8, 0.8, 3.6], [205, 4
 const twinkle = (x, y, r, d, i) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff"><animate attributeName="opacity" values="1;.1;1" dur="${d}s" begin="-${f2(i * 0.4)}s" repeatCount="indefinite"/></circle>`;
 
 // input: { rank, stars, period, label? }. Returns the SVG text.
-export function badgeSvg({ rank = 0, stars = 0, period = 'daily', size = 'large', label } = {}) {
+export function badgeSvg({ rank = 0, stars = 0, period = 'daily', size = 'large', label, lang } = {}) {
   const r = bodyOf(stars), c = rankOf(rank), m = METAL[Math.floor(c / 5)];
   const when = WORDS[period] || WORDS.daily;
-  const main = label || (rank > 0 ? `#${rank} Trending ${when}` : 'Listed on Ranker');
+  const main = label || (rank > 0 ? (lang ? `#${rank} in ${lang} ${when}` : `#${rank} Trending ${when}`) : 'Listed on Ranker');
   const title = `Flisk Ranker: ${main}. ${RANKS[c]}, ${BODIES[r]}.`;
   if (size === 'small') {
     const w = Math.ceil((main.length + 7) * 6.3) + 56;
@@ -69,8 +69,8 @@ export function badgeSvg({ rank = 0, stars = 0, period = 'daily', size = 'large'
 }
 
 // The snippets a maker pastes into a README.
-export function embed(origin, slug, { size = 'large', period = 'daily' } = {}) {
-  const q = [period !== 'daily' && `period=${period}`, size === 'small' && 'size=small'].filter(Boolean).join('&');
+export function embed(origin, slug, { size = 'large', period = 'daily', scope } = {}) {
+  const q = [period !== 'daily' && `period=${period}`, scope === 'language' && 'scope=language', size === 'small' && 'size=small'].filter(Boolean).join('&');
   const img = `${origin}/badge/${slug}.svg${q ? '?' + q : ''}`;
   const page = `${origin}/p/${slug}`;
   const h = size === 'small' ? 20 : 55;
