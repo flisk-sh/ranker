@@ -197,7 +197,7 @@ export async function handle(req, env, deps = {}) {
     const ps = sl.length ? (await env.DB.prepare('SELECT * FROM products WHERE slug IN (' + sl.map(() => '?').join(',') + ')').bind(...sl).all()).results || [] : [];
     return json({ items: page.mentionItems(ms, ps) });
   }
-  if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(rankedPub(d, 'daily', today), d.mentions)); })();
+  if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(rankedPub(d, 'daily', today), d.mentions, (await env.DB.prepare('SELECT COUNT(*) n FROM mentions WHERE at > ?').bind(Date.now() - 30 * 864e5).first())?.n || 0)); })();
   if (path === '/submit') return html(page.submit(who));
   if (path === '/badges') { const d = await load(env, today); return html(page.badges(rankedPub(d, 'daily', today), origin)); }
   if (path === '/') { const d = await load(env, today); return html(page.home(u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today)), period, d.snaps, d.mentions, u.searchParams.get('awesome') === '1', await loadPairs(env))); }
