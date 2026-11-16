@@ -7,7 +7,7 @@ export function fakeGithub(repos = {}, readmes = {}) {
     if (m) {
       const r = repos[m[1].toLowerCase()];
       if (!r) return new Response('{}', { status: 404 });
-      return new Response(JSON.stringify({ full_name: m[1], name: m[1].split('/')[1], description: r.description || 'A product', homepage: r.homepage || '', license: { spdx_id: 'MIT' }, language: 'TypeScript', topics: ['dev'], stargazers_count: r.stars, forks_count: r.forks || 0 }));
+      return new Response(JSON.stringify({ full_name: m[1], name: m[1].split('/')[1], description: r.description || 'A product', homepage: r.homepage || '', license: { spdx_id: 'MIT' }, language: r.language || 'TypeScript', topics: ['dev'], stargazers_count: r.stars, forks_count: r.forks || 0 }));
     }
     m = /raw\.githubusercontent\.com\/([^/]+\/[^/]+)\/HEAD\/README\.md/.exec(url);
     if (m) return readmes[m[1].toLowerCase()] != null ? new Response(readmes[m[1].toLowerCase()]) : new Response('', { status: 404 });
