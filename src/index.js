@@ -88,6 +88,20 @@ export async function handle(req, env, deps = {}) {
     for (let i = 0; i < rows.length; i += 45) await env.DB.batch(rows.slice(i, i + 45).flatMap((r) => [base.bind(r.slug, yday, r.stars | 0, r.forks | 0, today), st.bind(r.slug, today, r.stars | 0, r.forks | 0)]));
     return json({ saved: rows.length, day: today });
   }
+  if (req.method === 'POST' && path === '/api/ingest-facts') {
+    const key = env.INGEST_KEY;
+    if (!key || req.headers.get('authorization') !== `Bearer ${key}`) return json({ error: 'No.' }, 401);
+    const body = await req.json().catch(() => ({}));
+    const rows = (Array.isArray(body.rows) ? body.rows : []).filter((r) => r && typeof r.slug === 'string' && r.facts && typeof r.facts === 'object').slice(0, 200);
+    const now = deps.now();
+    for (let i = 0; i < rows.length; i += 45) {
+      const old = (await env.DB.prepare(`SELECT slug, json FROM facts WHERE slug IN (${rows.slice(i, i + 45).map(() => '?').join(',')})`).bind(...rows.slice(i, i + 45).map((r) => r.slug)).all()).results || [];
+      const prev = Object.fromEntries(old.map((o) => [o.slug, (() => { try { return JSON.parse(o.json); } catch { return {}; } })()]));
+      const st = env.DB.prepare('INSERT OR REPLACE INTO facts (slug, json, at) VALUES (?,?,?)');
+      await env.DB.batch(rows.slice(i, i + 45).map((r) => st.bind(r.slug, JSON.stringify({ ...prev[r.slug], ...r.facts }), now)));
+    }
+    return json({ saved: rows.length });
+  }
   if (path === '/health') return json({ ok: true });
   if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n', { headers: { 'content-type': 'text/plain' } });
   if (path === '/icon.svg') return svg(page.ICON);

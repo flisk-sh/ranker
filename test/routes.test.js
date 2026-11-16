@@ -153,3 +153,11 @@ test('ingest needs the key and saves today\'s snapshot', async () => {
   const list = await (await t.call('/api/repos')).json();
   expect(list[0].repo).toBe('acme/run');
 });
+
+test('ingest-facts needs the key', async () => {
+  const t = setup({}, {}, { INGEST_KEY: 'k' });
+  const r = await t.call('/api/ingest-facts', { method: 'POST', body: JSON.stringify({ rows: [] }) });
+  expect(r.status).toBe(401);
+  const ok = await t.call('/api/ingest-facts', { method: 'POST', headers: { authorization: 'Bearer k' }, body: JSON.stringify({ rows: [] }) });
+  expect((await ok.json()).saved).toBe(0);
+});
