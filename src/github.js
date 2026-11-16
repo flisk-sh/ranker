@@ -59,3 +59,24 @@ export async function fetchFacts(repo, { fetch: f = fetch, env, now = Date.now()
     commits: weeks,
   };
 }
+
+// Any link -> "owner/repo": a GitHub link, an npm or PyPI package page, or a website that links to its GitHub repo.
+export async function resolveLink(input, { fetch: f = fetch } = {}) {
+  const direct = parseRepo(input);
+  if (direct) return direct;
+  const u = String(input || '').trim();
+  const find = (s) => {
+    const m = /github\.com[/:]([\w.-]+)\/([\w.-]+?)(?:\.git)?(?=["'<>\s)#?/]|$)/i.exec(String(s || ''));
+    return m ? parseRepo(`https://github.com/${m[1]}/${m[2]}`) : '';
+  };
+  const json = async (url) => { const r = await f(url, { headers: { 'user-agent': 'flisk-ranker' } }).catch(() => null); return r?.ok ? r.json().catch(() => null) : null; };
+  let m = /^https?:\/\/(?:www\.)?npmjs\.com\/package\/((?:@[\w.-]+\/)?[\w.-]+)/i.exec(u);
+  if (m) { const j = await json(`https://registry.npmjs.org/${m[1].replace('/', '%2F')}`); return find(j?.repository?.url || j?.repository) || find(j?.homepage); }
+  m = /^https?:\/\/(?:www\.)?pypi\.org\/project\/([\w.-]+)/i.exec(u);
+  if (m) { const j = await json(`https://pypi.org/pypi/${m[1]}/json`); const i = j?.info || {}; return find(Object.values(i.project_urls || {}).join(' ')) || find(i.home_page); }
+  if (/^https?:\/\/[\w.-]+\.[a-z]{2,}(?:[/?#]|$)/i.test(u) && !/\b(localhost|producthunt\.com)\b/i.test(u)) {
+    const r = await f(u, { headers: { 'user-agent': 'flisk-ranker' } }).catch(() => null);
+    if (r?.ok) return find((await r.text().catch(() => '')).slice(0, 400000));
+  }
+  return '';
+}

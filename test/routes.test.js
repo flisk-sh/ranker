@@ -127,3 +127,17 @@ test('live mentions show the source logo, not initials', async () => {
   expect(html).toContain('aria-label="Hacker News"');
   expect(html).not.toContain('>HN<');
 });
+
+import { resolveLink } from '../src/github.js';
+test('resolveLink: github, npm, pypi, website', async () => {
+  const f = async (u) => {
+    const body = u.includes('registry.npmjs.org') ? { repository: { url: 'git+https://github.com/a/npmpkg.git' } }
+      : u.includes('pypi.org') ? { info: { project_urls: { Source: 'https://github.com/b/pypkg' } } } : null;
+    return body ? new Response(JSON.stringify(body)) : new Response('<a href="https://github.com/c/site">code</a>');
+  };
+  expect(await resolveLink('https://github.com/x/y', { fetch: f })).toBe('x/y');
+  expect(await resolveLink('https://www.npmjs.com/package/npmpkg', { fetch: f })).toBe('a/npmpkg');
+  expect(await resolveLink('https://pypi.org/project/pypkg/', { fetch: f })).toBe('b/pypkg');
+  expect(await resolveLink('https://example.com', { fetch: f })).toBe('c/site');
+  expect(await resolveLink('nonsense', { fetch: f })).toBe('');
+});

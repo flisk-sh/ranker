@@ -1,5 +1,5 @@
 // Flisk Ranker Worker: routes plus the hourly snapshot job.
-import { parseRepo, slugOf, fetchRepo, hasBadge, fetchFacts } from './github.js';
+import { parseRepo, resolveLink, slugOf, fetchRepo, hasBadge, fetchFacts } from './github.js';
 import { trending, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
@@ -22,8 +22,8 @@ const ranked = (d, period, today) => trending(d.products, d.snaps, period, today
 
 async function submitProduct(req, env, deps) {
   const body = await req.json().catch(() => ({}));
-  const repo = parseRepo(body.url);
-  if (!repo) return json({ error: 'Paste a GitHub link like https://github.com/you/your-product' }, 400);
+  const repo = await resolveLink(body.url, { fetch: deps.fetch });
+  if (!repo) return json({ error: 'No GitHub repo found at that link. Paste a GitHub, npm, PyPI or website link that points to one.' }, 400);
   const slug = slugOf(repo);
   const old = await env.DB.prepare('SELECT slug FROM products WHERE slug = ?').bind(slug).first();
   if (old) return json({ slug, url: `/p/${slug}` });
