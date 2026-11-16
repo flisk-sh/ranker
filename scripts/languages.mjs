@@ -3,7 +3,7 @@
 // GITHUB_TOKEN=... bun scripts/languages.mjs     RANKER=http://localhost:8820 to test locally
 export const LANGUAGES = ['Starlark', 'Lobster', 'Zig', 'Nim', 'Crystal', 'Gleam', 'Odin', 'V', 'Janet', 'Racket', 'Haskell', 'OCaml', 'Elixir', 'Erlang', 'Clojure', 'Julia', 'Prolog', 'Forth', 'Idris', 'Lean', 'Agda', 'Raku', 'Pony', 'Mojo', 'Roc', 'Vala', 'D', 'Fortran', 'COBOL', 'Brainfuck', 'LOLCODE', 'Jsonnet', 'Nix', 'Dhall', 'CUE', 'HCL', 'Cairo', 'Move', 'Solidity', 'Hack', 'Wren', 'Red', 'Factor', 'Elm', 'PureScript', 'ReScript', 'Grain', 'Ballerina', 'Common Lisp', 'Scheme', 'Smalltalk', 'Ada', 'Assembly', 'WebAssembly', 'Verilog', 'VHDL', 'GLSL', 'Typst', 'Just', 'Dockerfile'];
 // Projects people call by name that are not a language on GitHub.
-export const EXTRA = ['block/goose', 'aardappel/lobster'];
+export const EXTRA = ['aaif-goose/goose', 'aardappel/lobster'];
 
 export const slice = (hour, per = 8, list = LANGUAGES) => Array.from({ length: Math.min(per, list.length) }, (_, i) => list[(hour * per + i) % list.length]);
 

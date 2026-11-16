@@ -18,7 +18,7 @@ Options: `?period=daily|weekly|monthly|yearly`, `?size=small`, `?scope=language`
 
 ## Logos and seeding
 
-Each product shows its GitHub owner's avatar (letter tile if it fails to load). The `seed-trendshift` workflow runs hourly and submits every repo listed on trendshift.io (`bun scripts/trendshift.mjs`); repos already listed are skipped. It also runs `scripts/languages.mjs`, which adds the top repos in unusual languages (Starlark, Lobster, Zig, Gleam, ...) plus `block/goose`, one slice of the language list per hour.
+Each product shows its GitHub owner's avatar (letter tile if it fails to load). The `seed-trendshift` workflow runs hourly and submits every repo listed on trendshift.io (`bun scripts/trendshift.mjs`); repos already listed are skipped. It also runs `scripts/languages.mjs`, which adds the top repos in unusual languages (Starlark, Lobster, Zig, Gleam, ...) plus `aaif-goose/goose`, one slice of the language list per hour.
 
 ## Develop
 
