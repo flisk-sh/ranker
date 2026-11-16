@@ -31,15 +31,16 @@ async function load(env, today) {
   return { products, snaps, mentions, facts };
 }
 const ranked = (d, period, today) => trending(d.products, d.snaps, period, today);
+const rankedPub = (d, period, today) => { const all = ranked(d, period, today), pub = withoutAwesome(all), ids = new Set(pub.map((r) => r.slug)); return [...pub, ...all.filter((r) => !ids.has(r.slug))]; };
 
 // Yesterday's rank and the rank among products that share this one's first topic, this month.
 async function rankExtras(d, p, today, ranks) {
   const y = dayOf(Date.parse(today + 'T00:00:00Z') - 864e5);
-  const prev = trending(d.products, d.snaps.filter((s) => s.day <= y), 'daily', y).find((r) => r.slug === p.slug)?.rank;
+  const old = d.snaps.filter((s) => s.day <= y), prev = old.filter((s) => s.slug === p.slug).length >= 3 ? withoutAwesome(trending(d.products, old, 'daily', y)).find((r) => r.slug === p.slug)?.rank : undefined;
   const topic = String(p.topics || '').split(',').filter(Boolean)[0];
   let cat;
   if (topic) {
-    const mates = ranked(d, 'monthly', today).filter((r) => String(r.topics || '').split(',').includes(topic));
+    const mates = rankedPub(d, 'monthly', today).filter((r) => String(r.topics || '').split(',').includes(topic));
     const i = mates.findIndex((r) => r.slug === p.slug);
     if (i >= 0 && mates.length > 1) cat = { topic, rank: i + 1, of: mates.length };
   }
@@ -167,10 +168,10 @@ export async function handle(req, env, deps = {}) {
     const size = u.searchParams.get('size') === 'small' ? 'small' : 'large';
     if (m[1] === 'sample') return svg(page.sampleBadge(size));
     const d = await load(env, today);
-    const row = ranked(d, period, today).find((r) => r.slug === m[1]);
+    const row = rankedPub(d, period, today).find((r) => r.slug === m[1]);
     if (!row) return svg(badgeSvg({ size, label: 'Not listed yet' }));
     if (u.searchParams.get('scope') === 'language' && row.language) {
-      const peers = ranked(d, period, today).filter((r) => r.language === row.language);
+      const peers = rankedPub(d, period, today).filter((r) => r.language === row.language);
       return svg(badgeSvg({ rank: peers.findIndex((r) => r.slug === row.slug) + 1, stars: row.stars, period, size, lang: row.language, day: today }));
     }
     return svg(badgeSvg({ rank: row.rank, stars: row.stars, period, size, day: today }));
@@ -181,11 +182,11 @@ export async function handle(req, env, deps = {}) {
     const d = await load(env, today);
     const p = d.products.find((x) => x.slug === m[1]);
     if (!p) return html(page.shell('Not found', '<h1>Not listed.</h1><p class="sub"><a href="/submit" style="text-decoration:underline">Submit it</a>.</p>'), 404);
-    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), await rankExtras(d, p, today, Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank]))), await mentionsOf(env, [p.slug]), d.facts[p.slug]));
+    return html(page.product(p, rankedPub(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, rankedPub(d, 'daily', today), await rankExtras(d, p, today, Object.fromEntries(Object.keys(PERIODS).map((k) => [k, rankedPub(d, k, today).find((r) => r.slug === p.slug)?.rank]))), await mentionsOf(env, [p.slug]), d.facts[p.slug]));
   }
 
   if (path === '/compare') {
-    const d = await load(env, today), all = ranked(d, 'daily', today);
+    const d = await load(env, today), all = rankedPub(d, 'daily', today);
     const want = (u.searchParams.get('p') || '').split(',').filter(Boolean).slice(0, 4);
     return html(page.compare(want.map((s) => all.find((r) => r.slug === s)).filter(Boolean), d.snaps, all, d.facts, await mentionsOf(env, want)));
   }
@@ -196,9 +197,9 @@ export async function handle(req, env, deps = {}) {
     const ps = sl.length ? (await env.DB.prepare('SELECT * FROM products WHERE slug IN (' + sl.map(() => '?').join(',') + ')').bind(...sl).all()).results || [] : [];
     return json({ items: page.mentionItems(ms, ps) });
   }
-  if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(ranked(d, 'daily', today), d.mentions)); })();
+  if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(rankedPub(d, 'daily', today), d.mentions)); })();
   if (path === '/submit') return html(page.submit(who));
-  if (path === '/badges') { const d = await load(env, today); return html(page.badges(ranked(d, 'daily', today), origin)); }
+  if (path === '/badges') { const d = await load(env, today); return html(page.badges(rankedPub(d, 'daily', today), origin)); }
   if (path === '/') { const d = await load(env, today); return html(page.home(u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today)), period, d.snaps, d.mentions, u.searchParams.get('awesome') === '1', await loadPairs(env))); }
   return html(page.shell('Not found', '<h1>Not found.</h1>'), 404);
 }

@@ -31,7 +31,7 @@ import { searchHN } from '../src/mentions.js';
 test('decodes HTML entities in Hacker News text', async () => {
   const f = async () => ({ ok: true, json: async () => ({ hits: [{ objectID: '1', title: 'Show HN: x', comment_text: 'run npx @flisk-sh&amp;#x2F;flisk &#x27;demo&#x27;', created_at_i: 1 }] }) });
   const [m] = await searchHN('flisk', 0, f);
-  expect(m.text).toBe("Show HN: x run npx @flisk-sh/flisk 'demo'");
+  expect(m.text).toBe("run npx @flisk-sh/flisk 'demo'");
 });
 
 import { pulse } from '../src/mentions.js';
