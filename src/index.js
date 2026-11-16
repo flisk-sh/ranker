@@ -87,9 +87,12 @@ export async function handle(req, env, deps = {}) {
     const base = env.DB.prepare('INSERT INTO snapshots (slug, day, stars, forks) SELECT ?1, ?2, ?3, ?4 WHERE NOT EXISTS (SELECT 1 FROM snapshots WHERE slug = ?1 AND day < ?5)');
     // Hourly points go to Analytics Engine, only for products whose count changed (250 points per request at most).
     if (env.STARS) {
-      const marks = rows.slice(0, 200).map(() => '?').join(',');
-      const was = Object.fromEntries(((await env.DB.prepare(`SELECT slug, stars FROM snapshots WHERE day = ? AND slug IN (${marks})`).bind(today, ...rows.slice(0, 200).map((r) => r.slug)).all()).results || []).map((o) => [o.slug, o.stars]));
-      for (const r of rows.slice(0, 200)) if (was[r.slug] !== (r.stars | 0)) env.STARS.writeDataPoint({ indexes: [r.slug], blobs: [r.slug], doubles: [r.stars | 0, r.forks | 0] });
+      const pts = rows.slice(0, 200), was = {};
+      for (let i = 0; i < pts.length; i += 90) {
+        const part = pts.slice(i, i + 90);
+        for (const o of (await env.DB.prepare(`SELECT slug, stars FROM snapshots WHERE day = ? AND slug IN (${part.map(() => '?').join(',')})`).bind(today, ...part.map((r) => r.slug)).all()).results || []) was[o.slug] = o.stars;
+      }
+      for (const r of pts) if (was[r.slug] !== (r.stars | 0)) env.STARS.writeDataPoint({ indexes: [r.slug], blobs: [r.slug], doubles: [r.stars | 0, r.forks | 0] });
     }
     const yday = dayOf(deps.now() - 864e5);
     for (let i = 0; i < rows.length; i += 45) await env.DB.batch(rows.slice(i, i + 45).flatMap((r) => [base.bind(r.slug, yday, r.stars | 0, r.forks | 0, today), st.bind(r.slug, today, r.stars | 0, r.forks | 0)]));

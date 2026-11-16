@@ -57,7 +57,7 @@ const twinkle = (x, y, r, d, i) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#
 export function badgeSvg({ rank = 0, stars = 0, period = 'daily', size = 'large', label, lang, day } = {}) {
   const r = bodyOf(stars), c = rankOf(rank), m = METAL[Math.floor(c / 5)];
   const when = whenOf(period, day);
-  const main = label || (rank > 0 ? `#${rank} Trending ${when} \u00b7 ${lang || 'all languages'}` : 'Listed on Ranker');
+  const main = label || (rank > 0 ? `#${rank} Trending ${when}${lang ? ' \u00b7 ' + lang : ''}` : 'Listed on Ranker');
   const title = `Flisk Ranker: ${main}. ${RANKS[c]}, ${BODIES[r]}.`;
   if (size === 'small') {
     const w = Math.ceil((main.length + 7) * 6.3) + 56;
@@ -76,7 +76,7 @@ export function badgeSvg({ rank = 0, stars = 0, period = 'daily', size = 'large'
     const d = f2(over + 8), dur = f2(4 + d / 18);
     return `<clipPath id="${id}"><rect x="62" y="${y - 16}" width="${avail}" height="22"/></clipPath><g clip-path="url(#${id})"><text x="62" y="${y}" ${attrs}>${esc(text)}<animateTransform attributeName="transform" type="translate" values="0 0;0 0;-${d} 0;-${d} 0;0 0" keyTimes="0;.15;.6;.8;1" dur="${dur}s" repeatCount="indefinite"/></text></g>`;
   };
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="55" viewBox="0 0 250 55" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><rect x=".5" y=".5" width="249" height="54" rx="10" fill="#03040B" stroke="#2f3646"/>${stars6}<g transform="translate(2 1.5) scale(2)">${figure(r, c)}</g>${line('a', lab, lab.length * 6.4, 21, `font-family="ui-monospace,Menlo,monospace" font-size="9" letter-spacing="1" fill="${m}"`)}${line('b', main, main.length * 8.8, 40, 'font-family="Inter,system-ui,sans-serif" font-size="16" font-weight="500" fill="#fff"')}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="55" viewBox="0 0 250 55" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><rect x=".5" y=".5" width="249" height="54" rx="10" fill="#03040B" stroke="#2f3646"/>${stars6}<g transform="translate(2 1.5) scale(2)">${figure(r, c)}</g>${line('a', lab, lab.length * 6.4, 21, `font-family="ui-monospace,Menlo,monospace" font-size="9" letter-spacing="1" fill="${m}"`)}${line('b', main, main.length * 8.2, 40, 'font-family="Inter,system-ui,sans-serif" font-size="16" font-weight="500" fill="#fff"')}</svg>`;
 }
 
 // The snippets a maker pastes into a README.
