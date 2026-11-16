@@ -49,11 +49,13 @@ export async function fetchFacts(repo, { fetch: f = fetch, env, now = Date.now()
   const h = headers(env), since = new Date(now - 30 * 864e5).toISOString().slice(0, 10);
   const get = async (u) => { const r = await f(`https://api.github.com/${u}`, { headers: h }).catch(() => null); return r?.ok ? r.json().catch(() => null) : null; };
   const count = async (q) => (await get(`search/issues?per_page=1&q=${encodeURIComponent(`repo:${repo} ${q}`)}`))?.total_count ?? null;
-  const [prs, issues, rel, act] = await Promise.all([count(`is:pr is:merged merged:>=${since}`), count(`is:issue is:closed closed:>=${since}`), get(`repos/${repo}/releases?per_page=30`), get(`repos/${repo}/stats/commit_activity`)]);
+  const [prs, issues, rel, act, prsOpened, issuesOpened, recent] = await Promise.all([count(`is:pr is:merged merged:>=${since}`), count(`is:issue is:closed closed:>=${since}`), get(`repos/${repo}/releases?per_page=30`), get(`repos/${repo}/stats/commit_activity`), count(`is:pr created:>=${since}`), count(`is:issue created:>=${since}`), get(`repos/${repo}/commits?per_page=100&since=${since}T00:00:00Z`)]);
   const rels = Array.isArray(rel) ? rel.filter((r) => !r.draft) : null;
   const weeks = Array.isArray(act) && act.length >= 12 ? act.slice(-12).map((w) => w.total || 0) : null;
   return {
-    prs, issues,
+    prs, issues, prsOpened, issuesOpened,
+    commits30: Array.isArray(act) && act.length >= 4 ? act.slice(-4).reduce((a, w) => a + (w.total || 0), 0) : null,
+    contributors30: Array.isArray(recent) ? new Set(recent.map((c) => c.author?.login || c.commit?.author?.email).filter(Boolean)).size : null,
     releases: rels ? rels.filter((r) => Date.parse(r.published_at) > now - 84 * 864e5).length : null,
     last: rels?.[0] ? { tag: String(rels[0].tag_name || '').slice(0, 40), at: Date.parse(rels[0].published_at) || 0 } : null,
     commits: weeks,
