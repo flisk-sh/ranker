@@ -227,3 +227,14 @@ test('page views share one catalog read for a minute, and a submit refreshes it'
   await t.call('/');
   expect(reads).toBe(2);
 });
+
+test('search filters cover the whole catalog, not only the rendered rows', async () => {
+  const t = setup({ 'acme/run': { stars: 4200, language: 'Blade' }, 'acme/two': { stars: 5, language: 'Go' } });
+  await t.post('/api/submit', { url: 'https://github.com/acme/run' });
+  await t.post('/api/submit', { url: 'https://github.com/acme/two' });
+  const r = await (await t.call('/api/search?lang=Blade')).json();
+  expect(r.n).toBe(1);
+  expect(r.html).toContain('acme-run');
+  expect((await (await t.call('/api/search?min=1000')).json()).n).toBe(1);
+  expect((await (await t.call('/api/search')).json()).n).toBe(0);
+});
