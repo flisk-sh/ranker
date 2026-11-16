@@ -1,0 +1,19 @@
+name: seed-trendshift
+# Every hour: add the repos Trendshift lists to ranker.flisk.si. Already listed repos are skipped by the API.
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: seed-trendshift
+  cancel-in-progress: false
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun scripts/trendshift.mjs

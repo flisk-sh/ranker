@@ -34,7 +34,13 @@ const FILTER = `const q=document.getElementById('q'),rows=[...document.querySele
 
 const TONES = ['#1D4ED8', '#7C3AED', '#B45309', '#0F766E', '#BE185D', '#334155'];
 const toneOf = (slug) => TONES[[...String(slug)].reduce((a, c) => a + c.charCodeAt(0), 0) % TONES.length];
-const mark = (r, n = 44) => `<span class="mk" aria-hidden="true" style="width:${n}px;height:${n}px;background:${toneOf(r.slug)};font-size:${Math.round(n * .42)}px">${esc((r.name || '?')[0].toUpperCase())}</span>`;
+const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+// The letter tile is always drawn; the GitHub owner avatar sits on top and removes itself if it fails to load.
+export const mark = (r, n = 44) => {
+  const owner = String(r.repo || '').split('/')[0];
+  const img = OWNER.test(owner) ? `<img src="https://github.com/${esc(owner)}.png?size=${n * 2}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">` : '';
+  return `<span class="mk" aria-hidden="true" style="position:relative;overflow:hidden;width:${n}px;height:${n}px;background:${toneOf(r.slug)};font-size:${Math.round(n * .42)}px">${esc((r.name || '?')[0].toUpperCase())}${img}</span>`;
+};
 
 export function userBox(who) {
   return who ? `<a class="me" href="/logout" title="Sign out">${esc(who)} &middot; signed in</a>` : '<a class="cta" href="/login">Sign in with GitHub</a>';

@@ -16,6 +16,10 @@ Products ranked by stars gained on GitHub, each with a live README badge.
 
 Options: `?period=daily|weekly|monthly|yearly`, `?size=small`.
 
+## Logos and seeding
+
+Each product shows its GitHub owner's avatar (letter tile if it fails to load). The `seed-trendshift` workflow runs hourly and submits every repo listed on trendshift.io (`bun scripts/trendshift.mjs`); repos already listed are skipped.
+
 ## Develop
 
 ```bash
