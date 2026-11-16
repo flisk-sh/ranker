@@ -18,6 +18,6 @@ test('run searches each language of the hour, submits the finds and the extras',
   const r = await run({ fetchFn, base: 'http://x', hour: 0, sleep: async () => {}, log() {} });
   expect(urls.filter((u) => u.includes('api.github.com')).length).toBe(8);
   expect(bodies.join()).toContain('a/b');
-  expect(bodies.join()).toContain('block/goose');
+  expect(bodies.join()).toContain('aaif-goose/goose');
   expect(r.failed).toBe(0);
 });
