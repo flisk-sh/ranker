@@ -20,6 +20,20 @@ async function load(env, today) {
 }
 const ranked = (d, period, today) => trending(d.products, d.snaps, period, today);
 
+// Yesterday's rank and the rank among products that share this one's first topic, this month.
+async function rankExtras(d, p, today, ranks) {
+  const y = dayOf(Date.parse(today + 'T00:00:00Z') - 864e5);
+  const prev = trending(d.products, d.snaps.filter((s) => s.day <= y), 'daily', y).find((r) => r.slug === p.slug)?.rank;
+  const topic = String(p.topics || '').split(',').filter(Boolean)[0];
+  let cat;
+  if (topic) {
+    const mates = ranked(d, 'monthly', today).filter((r) => String(r.topics || '').split(',').includes(topic));
+    const i = mates.findIndex((r) => r.slug === p.slug);
+    if (i >= 0 && mates.length > 1) cat = { topic, rank: i + 1, of: mates.length };
+  }
+  return { ...ranks, prev, cat };
+}
+
 async function summary(env, slug, rank) {
   const p = await env.DB.prepare('SELECT * FROM products WHERE slug = ?').bind(slug).first();
   const sn = await env.DB.prepare('SELECT stars FROM snapshots WHERE slug = ? ORDER BY day DESC LIMIT 1').bind(slug).first();
@@ -111,7 +125,7 @@ export async function handle(req, env, deps = {}) {
     const d = await load(env, today);
     const p = d.products.find((x) => x.slug === m[1]);
     if (!p) return html(page.shell('Not found', '<h1>Not listed.</h1><p class="sub"><a href="/submit" style="text-decoration:underline">Submit it</a>.</p>'), 404);
-    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank])), d.mentions.filter((m) => m.slug === p.slug), d.facts[p.slug]));
+    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), await rankExtras(d, p, today, Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank]))), d.mentions.filter((m) => m.slug === p.slug), d.facts[p.slug]));
   }
 
   if (path === '/compare') {
