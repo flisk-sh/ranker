@@ -141,3 +141,15 @@ test('resolveLink: github, npm, pypi, website', async () => {
   expect(await resolveLink('https://example.com', { fetch: f })).toBe('c/site');
   expect(await resolveLink('nonsense', { fetch: f })).toBe('');
 });
+
+test('ingest needs the key and saves today\'s snapshot', async () => {
+  const t = setup({ 'acme/run': { stars: 10 } }, {}, { INGEST_KEY: 'k' });
+  await t.post('/api/submit', { url: 'https://github.com/acme/run' });
+  const body = { rows: [{ slug: 'acme-run', stars: 99, forks: 3 }] };
+  const no = await t.call('/api/ingest', { method: 'POST', body: JSON.stringify(body) });
+  expect(no.status).toBe(401);
+  const ok = await t.call('/api/ingest', { method: 'POST', headers: { authorization: 'Bearer k' }, body: JSON.stringify(body) });
+  expect((await ok.json()).saved).toBe(1);
+  const list = await (await t.call('/api/repos')).json();
+  expect(list[0].repo).toBe('acme/run');
+});

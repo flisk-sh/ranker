@@ -58,6 +58,19 @@ export async function handle(req, env, deps = {}) {
   if (a) return a;
   const who = await userOf(req, env);
   const html = (s, status = 200) => mk(s, status, who);
+  if (path === '/api/repos') {
+    const { results } = await env.DB.prepare('SELECT slug, repo FROM products').all();
+    return json(results);
+  }
+  if (req.method === 'POST' && path === '/api/ingest') {
+    const key = env.INGEST_KEY;
+    if (!key || req.headers.get('authorization') !== `Bearer ${key}`) return json({ error: 'No.' }, 401);
+    const body = await req.json().catch(() => ({}));
+    const rows = (Array.isArray(body.rows) ? body.rows : []).filter((r) => r && typeof r.slug === 'string' && Number.isFinite(r.stars)).slice(0, 500);
+    const st = env.DB.prepare('INSERT OR REPLACE INTO snapshots (slug, day, stars, forks) VALUES (?,?,?,?)');
+    for (let i = 0; i < rows.length; i += 90) await env.DB.batch(rows.slice(i, i + 90).map((r) => st.bind(r.slug, today, r.stars | 0, r.forks | 0)));
+    return json({ saved: rows.length, day: today });
+  }
   if (path === '/health') return json({ ok: true });
   if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n', { headers: { 'content-type': 'text/plain' } });
   if (path === '/icon.svg') return svg(page.ICON);
