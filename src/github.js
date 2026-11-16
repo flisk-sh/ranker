@@ -17,7 +17,7 @@ export async function fetchRepo(repo, { fetch: f = fetch, env } = {}) {
   const r = await f(`https://api.github.com/repos/${repo}`, { headers: headers(env) }).catch(() => null);
   if (!r) return { error: 'GitHub did not answer. Try again in a minute.' };
   if (r.status === 404) return { error: 'No public repo at that link.' };
-  if (r.status === 403 || r.status === 429) return { error: 'GitHub is busy. Try again in a minute.' };
+  if (r.status === 403 || r.status === 429) return { error: `GitHub is busy (${r.status}). Try again in a minute.` };
   if (!r.ok) return { error: `GitHub answered ${r.status}.` };
   const j = await r.json().catch(() => null);
   if (!j || typeof j.stargazers_count !== 'number') return { error: 'GitHub gave an unexpected answer.' };
