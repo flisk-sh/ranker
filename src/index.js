@@ -51,7 +51,8 @@ async function submitProduct(req, env, deps) {
 export async function handle(req, env, deps = {}) {
   deps = { fetch: deps.fetch || fetch, now: deps.now || Date.now };
   const u = new URL(req.url), path = u.pathname, origin = u.origin, today = dayOf(deps.now());
-  const period = PERIODS[u.searchParams.get('period')] ? u.searchParams.get('period') : 'daily';
+  const asked = u.searchParams.get('period') || u.searchParams.get('type');
+  const period = PERIODS[asked] ? asked : 'daily';
 
   const a = await authRoute(req, env, deps.now());
   if (a) return a;
