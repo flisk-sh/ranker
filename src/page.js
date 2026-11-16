@@ -1,67 +1,121 @@
-// The HTML of Ranker: dark, a twinkling sky behind. Pure functions returning strings.
+// The HTML of Ranker, drawn from the design: black, hairlines, a blue glow. Pure functions returning strings.
 import { badgeSvg, embed, BODIES, RANKS, bodyOf, rankOf } from './badge.js';
-import { short } from './score.js';
+import { short, history } from './score.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#03040B"/><path d="M32 10L36.5 27.5L54 32L36.5 36.5L32 54L27.5 36.5L10 32L27.5 27.5Z" fill="#F5C451"/></svg>';
 
-const CSS = `*{box-sizing:border-box}body{margin:0;background:#02030a;color:#fff;font:300 16px/1.55 Inter,system-ui,sans-serif}
-canvas#sky{position:fixed;inset:0;width:100%;height:100%;z-index:0}
-.w{position:relative;z-index:1;max-width:1040px;margin:0 auto;padding:0 20px 60px}
-a{color:#fff;text-decoration:none}nav{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:center;padding:20px 0;font-size:14px}
-nav .l{font:500 17px ui-monospace,Menlo,monospace}nav .s{flex:1}nav .cta{background:#fff;color:#000;border-radius:8px;padding:8px 14px;font-weight:500}
-h1{font-size:clamp(34px,6vw,64px);font-weight:200;letter-spacing:-.04em;line-height:1.05;margin:36px 0 14px}
-.sub{color:#B8BDC6;font-size:18px;max-width:640px}.lbl{font:400 11px ui-monospace,Menlo,monospace;color:#8A8F98;letter-spacing:.08em;text-transform:uppercase}
-.tabs{display:flex;gap:8px;margin:28px 0 10px;flex-wrap:wrap}.tabs a{border:1px solid #2A2F38;border-radius:99px;padding:5px 14px;font-size:13px;color:#C9CDD3}.tabs a.on{background:#fff;color:#000;border-color:#fff}
-.row{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:14px 0;border-top:1px solid rgba(255,255,255,.1)}
-.row .n{width:34px;font:500 15px ui-monospace,monospace;color:#8A8F98}.row .m{flex:1 1 220px;min-width:0}.row .m b{font-weight:500}.row .m p{margin:0;color:#8A8F98;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.g{font:500 14px ui-monospace,monospace;color:#7ee2a8}.box{border:1px solid #2A2F38;border-radius:14px;background:rgba(5,7,12,.82);padding:22px}
-code,pre{font:12px/1.7 ui-monospace,Menlo,monospace;color:#9AA0AA;background:#000;border:1px solid #1E2229;border-radius:10px;padding:12px;display:block;word-break:break-all;white-space:pre-wrap;margin:8px 0}
-input{width:100%;background:#000;border:1px solid #2A2F38;border-radius:10px;color:#fff;font:16px Inter,system-ui,sans-serif;padding:14px}
-button,.btn{background:#fff;color:#000;border:0;border-radius:8px;padding:11px 18px;font:500 14px Inter,system-ui,sans-serif;cursor:pointer;display:inline-block}
-.grid{display:flex;flex-wrap:wrap;gap:18px}.grid>*{flex:1 1 300px}small{color:#6B7079}`;
+const CSS = `*{box-sizing:border-box}body{margin:0;background:#000;color:#fff;font:300 16px/1.55 Inter,system-ui,sans-serif}
+a{color:#fff;text-decoration:none}.mono{font-family:'Geist Mono',ui-monospace,Menlo,monospace}
+.w{position:relative;max-width:1280px;margin:0 auto;padding:0 40px 56px}@media(max-width:640px){.w{padding:0 16px 40px}}
+nav{display:flex;flex-wrap:wrap;gap:12px 26px;align-items:center;padding:20px 0;font-size:13px}nav a{color:#C9CDD3;font-weight:400}
+nav .l{font:500 17px 'Geist Mono',ui-monospace,monospace;color:#fff}nav .s{flex:1}nav .cta{background:#fff;color:#000;border-radius:8px;padding:8px 14px;font-weight:500}nav .me{border:1px solid #2A2F38;border-radius:8px;padding:8px 14px;background:#0B0D11;color:#fff}
+.hero{position:relative;overflow:hidden;padding:44px 0 36px}.hero:before{content:'';position:absolute;right:-150px;top:-250px;width:760px;height:760px;border-radius:50%;background:radial-gradient(circle,rgba(60,120,255,.25),rgba(0,0,0,0) 65%)}.hero>*{position:relative;max-width:760px}
+h1{font-size:clamp(36px,6vw,64px);font-weight:200;letter-spacing:-.045em;line-height:1.03;margin:14px 0 16px}
+.sub{color:#B8BDC6;font-size:18px;line-height:1.5;max-width:680px;margin:0}.lbl{font:400 11px 'Geist Mono',ui-monospace,monospace;color:#8A8F98;letter-spacing:.08em;text-transform:uppercase}
+.pill{display:inline-block;border:1px solid #2A2F38;border-radius:99px;padding:4px 11px;font:400 12px Inter,sans-serif;color:#C9CDD3}.pill.on{background:#fff;color:#000;border-color:#fff}.pill.ok{border-color:#1F5A3E;color:#5BE49B}
+.card,.box{border:1px solid #2A2F38;border-radius:16px;background:#07090C;padding:24px}
+.btn,button{border:1px solid #2A2F38;background:#0B0D11;color:#fff;border-radius:8px;padding:10px 16px;font:400 13px Inter,sans-serif;display:inline-block;cursor:pointer}.btn.p,button{background:#fff;color:#000;font-weight:500;border-color:#fff}
+.stats{display:flex;flex-wrap:wrap;border-top:1px solid #1E2229;border-bottom:1px solid #1E2229}.stats>div{flex:1 1 200px;padding:18px 0 18px 24px;border-left:1px solid #1E2229}.stats b{display:block;font-size:30px;font-weight:200;letter-spacing:-.03em}
+.cols{display:flex;flex-wrap:wrap;gap:36px;padding-top:32px;align-items:flex-start}.cols>.a{flex:3 1 620px;min-width:0}.cols>.b{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:20px}
+.row{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:16px 0;border-top:1px solid #1E2229}
+.mk{flex:none;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font:500 18px Inter,sans-serif}
+.row .n{width:30px;font:500 14px 'Geist Mono',monospace;color:#6B7079}.row .m{flex:1 1 240px;min-width:0}.row .m b{font-weight:500;font-size:16px}.row .m p{margin:2px 0 0;color:#8A8F98;font-size:13px}
+.g{font:500 15px 'Geist Mono',monospace;color:#5BE49B;text-align:right}.g small{display:block;font-size:10px;color:#6B7079;letter-spacing:.08em}
+code,pre{font:12px/1.7 'Geist Mono',ui-monospace,Menlo,monospace;color:#9AA0AA;background:#000;border:1px solid #1E2229;border-radius:10px;padding:12px;display:block;word-break:break-all;white-space:pre-wrap;margin:8px 0}
+input,select{width:100%;background:#0B0D11;border:1px solid #2A2F38;border-radius:10px;color:#fff;font:16px Inter,system-ui,sans-serif;padding:14px}
+.grid{display:flex;flex-wrap:wrap;gap:18px}.grid>*{flex:1 1 300px}small{color:#6B7079}.ok{color:#5BE49B}
+.steps{display:flex;flex-wrap:wrap;border-top:1px solid #1E2229;border-bottom:1px solid #1E2229}.steps>div{flex:1 1 220px;padding:18px 0 18px 24px;border-left:1px solid #1E2229}
+.live{border-color:#1F5A3E;background:linear-gradient(160deg,#08170F,#07090C)}.blue{background:linear-gradient(160deg,#0C1424,#07090C)}
+.kv{display:flex;flex-direction:column;gap:12px;font-size:14px;line-height:1.5;color:#D5D8DD}.kv div{display:flex;gap:10px}.kv i{font-style:normal;color:#5BE49B}`;
 
-const SKY = `const c=document.getElementById('sky'),x=c.getContext('2d');let S=[],W,H;function z(){const d=devicePixelRatio||1;W=c.width=innerWidth*d;H=c.height=innerHeight*d;S=[];for(let i=0;i<Math.min(400,innerWidth*innerHeight/3000);i++)S.push({x:Math.random()*W,y:Math.random()*H,r:(.4+Math.random())*d,p:Math.random()*6.3,v:.6+Math.random()*2})}z();addEventListener('resize',z);
-(function f(t){x.clearRect(0,0,W,H);for(const s of S){x.fillStyle='rgba(255,255,255,'+(.15+.85*(.5+.5*Math.sin(t/1000*s.v+s.p)))+')';x.beginPath();x.arc(s.x,s.y,s.r,0,6.3);x.fill()}requestAnimationFrame(f)})(0)`;
+const TONES = ['#1D4ED8', '#7C3AED', '#B45309', '#0F766E', '#BE185D', '#334155'];
+const toneOf = (slug) => TONES[[...String(slug)].reduce((a, c) => a + c.charCodeAt(0), 0) % TONES.length];
+const mark = (r, n = 44) => `<span class="mk" aria-hidden="true" style="width:${n}px;height:${n}px;background:${toneOf(r.slug)};font-size:${Math.round(n * .42)}px">${esc((r.name || '?')[0].toUpperCase())}</span>`;
+
+export function userBox(who) {
+  return who ? `<a class="me" href="/logout" title="Sign out">${esc(who)} &middot; signed in</a>` : '<a class="cta" href="/login">Sign in with GitHub</a>';
+}
 
 export function shell(title, body, { desc = 'Flisk Ranker ranks products by what happened on GitHub and gives each one a live README badge.', script = '' } = {}) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><link rel="icon" href="/icon.svg"><style>${CSS}</style></head><body><canvas id="sky"></canvas><div class="w"><nav><a class="l" href="/">&gt;_ flisk.ranker</a><a href="/">Trending</a><a href="/compare">Compare</a><a href="/live">Live mentions</a><a href="/badges">Badges</a><a href="/submit">Submit</a><span class="s"></span><a class="cta" href="/submit">Submit your product</a></nav>${body}</div><script>${SKY}</script>${script ? `<script>${script}</script>` : ''}</body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><link rel="icon" href="/icon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"><style>${CSS}</style></head><body><div class="w"><nav><a class="l" href="/">&gt;_ flisk.ranker</a><a href="/">Trending</a><a href="/compare">Compare</a><a href="/live">Live mentions</a><a href="/badges">Badges</a><a href="/submit">Submit</a><span class="s"></span><!--USER--></nav>${body}</div>${script ? `<script>${script}</script>` : ''}</body></html>`;
 }
 
 const PER = [['daily', 'Today'], ['weekly', 'This week'], ['monthly', 'This month'], ['yearly', 'This year']];
+const PLAB = { daily: 'STARS TODAY', weekly: 'STARS THIS WEEK', monthly: 'STARS THIS MONTH', yearly: 'STARS THIS YEAR' };
 
-export function home(rows, period) {
-  const tabs = PER.map(([k, l]) => `<a href="/?period=${k}" class="${k === period ? 'on' : ''}">${l}</a>`).join('');
+function line(vals, w = 120, h = 34, color = '#5BE49B') {
+  if (!vals || vals.length < 2) return '';
+  const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  const pts = vals.map((v, i) => `${Math.round((i / (vals.length - 1)) * w)},${Math.round(h - 2 - ((v - lo) / span) * (h - 4))}`).join(' ');
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6"/></svg>`;
+}
+const starsOf = (snaps, slug, n = 30) => snaps.filter((x) => x.slug === slug).sort((a, b) => (a.day < b.day ? -1 : 1)).slice(-n).map((x) => x.stars);
+
+export function home(rows, period, snaps = []) {
+  const stars = rows.reduce((a, r) => a + r.stars, 0), gain = rows.reduce((a, r) => a + Math.max(0, r.gain), 0), ver = rows.filter((r) => r.verified).length;
+  const tabs = PER.map(([k, l]) => `<a href="/?period=${k}" class="pill ${k === period ? 'on' : ''}">${l}</a>`).join(' ');
   const list = rows.length
-    ? rows.slice(0, 100).map((r) => `<div class="row"><span class="n">${r.rank}</span><div class="m"><b><a href="/p/${esc(r.slug)}">${esc(r.name)}</a></b>${r.verified ? ' <small>verified</small>' : ''}<p>${esc(r.tagline)}</p></div><span class="g">${r.gain >= 0 ? '+' : ''}${short(r.gain)}</span><span class="lbl">${short(r.stars)} stars</span></div>`).join('')
-    : '<p class="sub">No products yet. <a href="/submit" style="text-decoration:underline">Be the first</a>.</p>';
-  return shell('Flisk Ranker', `<h1>Where products rise.</h1><p class="sub">Ranked by stars gained, counted the same way for everyone. Every product gets a live README badge.</p><div class="tabs">${tabs}</div>${list}`);
+    ? rows.slice(0, 100).map((r) => `<div class="row"><span class="n">${r.rank}</span>${mark(r)}<div class="m"><b><a href="/p/${esc(r.slug)}">${esc(r.name)}</a></b> <span class="pill">Repo</span>${r.verified ? ' <span class="pill ok">&#10003; VERIFIED</span>' : ''}${r.isNew ? ' <span class="pill">NEW</span>' : ''}<p>${esc(r.tagline)}</p><div style="margin-top:6px">${[r.license, r.language].filter(Boolean).map((x) => `<span class="pill">${esc(x)}</span>`).join(' ')} <span class="pill">&#9733; ${short(r.stars)}</span> <span class="pill">&#9095; ${short(r.forks || 0)}</span></div></div>${line(starsOf(snaps, r.slug))}<div class="g">${r.gain >= 0 ? '+' : ''}${short(r.gain)}<small>${PLAB[period]}</small></div></div>`).join('')
+    : '<p class="sub" style="padding:24px 0">No products yet. <a href="/submit" style="text-decoration:underline">Be the first</a>.</p>';
+  const sample = rows[0]?.slug || 'sample';
+  const body = `<div class="hero"><div class="lbl">FLISK RANKER &middot; RANKED BY STARS GAINED</div><h1>Where products rise.</h1><p class="sub">Every product on GitHub, ranked the same way for everyone. Submit yours, wear the live badge in your README.</p><p style="margin-top:24px"><a class="btn p" href="/submit" style="padding:12px 20px">Submit your product, free</a> <a class="btn" href="/badges" style="padding:12px 20px">How the badge works</a></p></div>
+<div class="stats"><div><b>${rows.length}</b><span class="lbl">Products listed</span></div><div><b>${short(stars)}</b><span class="lbl">Stars in total</span></div><div><b>+${short(gain)}</b><span class="lbl">${PLAB[period].toLowerCase()}</span></div><div><b>${ver}</b><span class="lbl">Verified by makers</span></div></div>
+<div class="cols"><div class="a"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px"><span class="lbl">TRENDING</span><span style="flex:1"></span>${tabs}</div>${list}</div>
+<div class="b"><div class="card"><div class="lbl">YOUR BADGE</div><p style="margin:12px 0"><img src="/badge/${esc(sample)}.svg" width="250" height="55" alt="Badge"></p><a class="btn" href="/badges">See all badges</a></div>
+<div class="card"><div class="lbl">LIVE MENTIONS</div><p style="margin:10px 0 14px;font-size:14px;color:#9AA0AA">Who talks about listed products, from Flisk Grow. Coming soon.</p><a class="btn" href="/live">Open live mentions</a></div>
+<div class="card blue"><div class="lbl">FOR MAKERS</div><p style="margin:10px 0 14px;font-size:14px;color:#B8BDC6">Paste one link. We read GitHub every day and give you a live badge. Nobody can buy a rank.</p><a class="btn p" href="/submit">Submit your product</a></div></div></div>`;
+  return shell('Flisk Ranker', body);
 }
 
 export function embedBox(origin, slug) {
   const L = embed(origin, slug), S = embed(origin, slug, { size: 'small' });
-  return `<div class="box"><div class="lbl">Copy this into your README</div><code>${esc(L.markdown)}</code><div class="lbl" style="margin-top:14px">Small, 20 px</div><code>${esc(S.markdown)}</code><div class="lbl" style="margin-top:14px">HTML</div><code>${esc(L.html)}</code></div>`;
+  return `<div class="card"><div class="lbl">COPY THIS INTO YOUR README</div><code id="md">${esc(L.markdown)}</code><div class="lbl" style="margin-top:14px">Small, 20 px</div><code>${esc(S.markdown)}</code><div class="lbl" style="margin-top:14px">HTML</div><code>${esc(L.html)}</code><button type="button" onclick="navigator.clipboard.writeText(document.getElementById('md').textContent);this.textContent='Copied'">Copy</button></div>`;
 }
 
-export function product(p, row, origin) {
+function momentum(snaps, slug) {
+  const s = snaps.filter((x) => x.slug === slug).sort((a, b) => (a.day < b.day ? -1 : 1)).slice(-90);
+  if (s.length < 2) return '<p style="color:#8A8F98;font-size:14px;margin:10px 0 0">The chart fills in as we read GitHub each day. Check back tomorrow.</p>';
+  const v = s.map((x) => x.stars), lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1, W = 800, H = 160;
+  const pts = v.map((y, i) => `${Math.round((i / (v.length - 1)) * W)},${Math.round(H - 8 - ((y - lo) / span) * (H - 16))}`);
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin-top:12px" preserveAspectRatio="none" aria-label="Stars, last ${s.length} days"><polygon points="0,${H} ${pts.join(' ')} ${W},${H}" fill="rgba(60,120,255,.18)"/><polyline points="${pts.join(' ')}" fill="none" stroke="#7DA7FF" stroke-width="2"/></svg><div class="lbl" style="display:flex;justify-content:space-between;margin-top:6px"><span>${esc(s[0].day)} &middot; ${short(lo)}</span><span>${esc(s[s.length - 1].day)} &middot; ${short(hi)}</span></div>`;
+}
+
+export function product(p, row, origin, snaps = [], all = []) {
   const rank = row?.rank || 0, stars = row?.stars || 0;
-  const body = `<div class="lbl" style="margin-top:36px">${esc(p.repo)}</div><h1 style="margin-top:8px">${esc(p.name)}</h1><p class="sub">${esc(p.tagline)}</p>
-<div class="grid" style="margin-top:26px"><div><div class="lbl" style="margin-bottom:10px">Your badge, live</div><img src="/badge/${esc(p.slug)}.svg" width="250" height="55" alt="Flisk Ranker badge"><div style="margin-top:10px"><img src="/badge/${esc(p.slug)}.svg?size=small" height="20" alt="Small Flisk Ranker badge"></div>
-<p class="sub" style="font-size:14px;margin-top:18px">${rank ? `#${rank} today, ${RANKS[rankOf(rank)]}. ${BODIES[bodyOf(stars)]} with ${short(stars)} stars.` : 'Not ranked yet.'}</p>
-<p style="margin-top:6px">${p.verified ? '<span class="g">Verified: the badge is in the README.</span>' : '<small>Not verified yet. Put the badge in your README, then press the button.</small><br><br><button id="v">Check my README</button> <small id="vm"></small>'}</p></div>${embedBox(origin, p.slug)}</div>
-<div class="box" style="margin-top:18px"><div class="lbl">Facts, from GitHub</div><p style="margin:8px 0 0">${[p.license, p.language, short(stars) + ' stars'].filter(Boolean).map(esc).join(' · ')}${p.homepage ? ` · <a style="text-decoration:underline" href="${esc(p.homepage)}" rel="nofollow">website</a>` : ''}</p></div>`;
+  const alts = all.filter((r) => r.slug !== p.slug && (!p.language || r.language === p.language)).slice(0, 4);
+  const body = `<div style="padding:24px 0 8px"><span class="lbl"><a href="/">TRENDING</a> / ${esc(p.repo)}</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:22px;align-items:center;padding:12px 0 24px">${mark(p, 92)}<div style="flex:1 1 380px;min-width:0"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><h1 style="margin:0;font-size:clamp(30px,5vw,48px)">${esc(p.name)}</h1><span class="pill">Repo</span>${p.verified ? '<span class="pill ok">&#10003; VERIFIED BY THE MAKER</span>' : ''}</div><p class="sub" style="margin-top:8px">${esc(p.tagline)}</p><div style="margin-top:12px">${[p.license, p.language].filter(Boolean).map((x) => `<span class="pill">${esc(x)}</span>`).join(' ')}</div><p style="margin-top:14px">${p.homepage ? `<a class="btn p" href="${esc(p.homepage)}" rel="nofollow">Visit</a> ` : ''}<a class="btn" href="https://github.com/${esc(p.repo)}" rel="nofollow">View on GitHub</a> <a class="btn" href="/compare?p=${esc(p.slug)}">Compare</a></p></div></div>
+<div class="stats"><div><b>${rank ? '#' + rank : '-'}</b><span class="lbl">Rank today</span></div><div><b>${short(stars)}</b><span class="lbl">Stars</span></div><div><b>${short(row?.forks || 0)}</b><span class="lbl">Forks</span></div><div><b>${row ? (row.gain >= 0 ? '+' : '') + short(row.gain) : '-'}</b><span class="lbl">Stars today</span></div></div>
+<div class="cols"><div class="a"><div class="card"><div class="lbl">MOMENTUM &middot; STARS, LAST 90 DAYS</div>${momentum(snaps, p.slug)}</div>
+<div class="card" style="margin-top:20px"><div class="lbl">MENTIONS</div><p style="margin:10px 0 0;font-size:14px;color:#9AA0AA">Where people talk about ${esc(p.name)} will show here when Flisk Grow is connected.</p></div></div>
+<div class="b"><div class="card"><div class="lbl">YOUR BADGE, LIVE</div><p style="margin:14px 0 8px"><img src="/badge/${esc(p.slug)}.svg" width="250" height="55" alt="Flisk Ranker badge"></p><img src="/badge/${esc(p.slug)}.svg?size=small" height="20" alt="Small badge"><p style="font-size:13px;color:#9AA0AA;margin:12px 0">${rank ? `#${rank} today, ${RANKS[rankOf(rank)]}. ${BODIES[bodyOf(stars)]} with ${short(stars)} stars.` : 'Not ranked yet.'}</p>${p.verified ? '<span class="ok">Verified: the badge is in the README.</span>' : '<small>Not verified yet. Put the badge in your README, then press the button.</small><br><br><button id="v">Check my README</button> <small id="vm"></small>'}</div>${embedBox(origin, p.slug)}
+${alts.length ? `<div class="card"><div class="lbl">ALTERNATIVES</div>${alts.map((r) => `<div style="display:flex;gap:10px;align-items:center;padding-top:12px">${mark(r, 30)}<a href="/p/${esc(r.slug)}">${esc(r.name)}</a><span style="flex:1"></span><span class="lbl">${short(r.stars)} &#9733;</span></div>`).join('')}</div>` : ''}</div></div>`;
   const script = p.verified ? '' : `document.getElementById('v').onclick=async()=>{const m=document.getElementById('vm');m.textContent='Checking...';const r=await fetch('/api/verify/${esc(p.slug)}',{method:'POST'}).then(r=>r.json()).catch(()=>({}));m.textContent=r.verified?'Verified.':'Badge not found in the README yet.';if(r.verified)location.reload()}`;
   return shell(`${p.name} on Flisk Ranker`, body, { desc: p.tagline || undefined, script });
 }
 
-export function submit() {
+export function submit(who = '') {
   const script = `document.getElementById('f').onsubmit=async e=>{e.preventDefault();const m=document.getElementById('m');m.textContent='Importing...';const r=await fetch('/api/submit',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:document.getElementById('u').value})}).then(r=>r.json()).catch(()=>({error:'No answer. Try again.'}));if(r.slug)location.href='/p/'+r.slug;else m.textContent=r.error||'Something went wrong.'}`;
-  return shell('Submit your product', `<h1>One link.</h1><p class="sub">Paste your GitHub link. We import the name, description, license and stars. Nothing to fill in.</p><form id="f" class="box" style="margin-top:24px"><input id="u" placeholder="https://github.com/you/your-product" required><br><br><button>Get my badge</button> <small id="m"></small></form>`, { script });
+  const step = (n, t, c, on) => `<div><div class="mono" style="font-size:12px;color:${c}">${n}</div><div style="font-size:16px;font-weight:400;margin-top:6px;color:${on ? '#fff' : '#8A8F98'}">${t}</div></div>`;
+  const body = `<div class="hero"><div class="lbl">SUBMIT YOUR PRODUCT &middot; FREE &middot; TWO MINUTES</div><h1>Get listed, get ranked, wear the badge.</h1><p class="sub">Paste one link. We read GitHub every day and give you a live badge to put in your README.</p></div>
+<div class="steps">${step(who ? '01 &middot; DONE' : '01', who ? `Signed in as ${esc(who)}` : 'Sign in with GitHub', who ? '#5BE49B' : '#fff', true)}${step('02 &middot; NOW', 'Paste one link', '#fff', true)}${step('03', 'Add the badge', '#6B7079', false)}${step('04', 'Go live', '#6B7079', false)}</div>
+<div class="cols"><div class="a"><div class="card"><div class="lbl">STEP 2 &middot; PASTE ONE LINK. WE DO THE REST.</div><form id="f" style="margin-top:16px"><input id="u" placeholder="https://github.com/you/your-product" required><p style="margin:14px 0 0"><button>Import</button> <small id="m"></small></p></form><p style="font-size:12px;color:#6B7079;margin:12px 0 0">Works with a GitHub repo link. Name, line, licence, language and stars all come from the link.</p>${who ? '' : '<p style="margin:14px 0 0"><a class="btn" href="/login">Sign in with GitHub</a> <small>to see your products here later</small></p>'}</div>
+<div class="card" style="margin-top:20px"><div class="lbl">STEP 3 &middot; ADD THE BADGE TO PROVE IT IS YOURS</div><p style="margin:12px 0 0;font-size:14px;color:#B8BDC6">After you import, your page shows the line to paste in your README. When we find it there, your page turns <span class="ok">verified</span>.</p><p style="margin:16px 0 0"><img src="/badge/sample.svg" width="250" height="55" alt="Sample badge"></p></div></div>
+<div class="b"><div class="card"><div class="lbl">WHAT YOU GET, FREE</div><div class="kv" style="margin-top:14px"><div><i>&#10003;</i>A page with your live rank and star history</div><div><i>&#10003;</i>Stars and forks read every day</div><div><i>&#10003;</i>Rank badges for your README, big and small</div><div><i>&#10003;</i>A spot in compare and alternatives</div></div></div>
+<div class="card"><div class="lbl">HOW THE RANK WORKS</div><p style="margin:10px 0 0;font-size:13px;line-height:1.6;color:#9AA0AA">Stars gained, counted the same way for everyone. Paying never changes a rank.</p></div></div></div>`;
+  return shell('Submit your product', body, { script });
 }
 
 export function badges(rows, origin) {
-  const list = rows.slice(0, 50).map((r) => `<div class="row"><div class="m"><b><a href="/p/${esc(r.slug)}">${esc(r.name)}</a></b><p>${esc(origin)}/badge/${esc(r.slug)}.svg</p></div><img src="/badge/${esc(r.slug)}.svg" width="250" height="55" loading="lazy" alt=""></div>`).join('');
-  return shell('Badges', `<h1>Show your rank where people look.</h1><p class="sub">Every listed product gets a live badge. It updates by itself and links to its Ranker page. Nobody can buy a rank.</p><div style="margin:26px 0"><img src="/badge/sample.svg" width="250" height="55" alt="Sample badge"></div>${list}`);
+  const kinds = [['Rank today', 'daily'], ['Rank this week', 'weekly'], ['Rank this month', 'monthly'], ['Rank this year', 'yearly']];
+  const top = rows[0]?.slug;
+  const gallery = top ? kinds.map(([n, per]) => `<div class="card" style="flex:1 1 300px"><img src="/badge/${esc(top)}.svg?period=${per}" width="250" height="55" alt=""><div style="font-size:15px;font-weight:500;margin:14px 0 4px">${n}</div><div style="font-size:13px;color:#8A8F98">Add ?period=${per} to the badge address.</div></div>`).join('') : '';
+  const list = rows.slice(0, 50).map((r) => `<div class="row">${mark(r, 38)}<div class="m"><b><a href="/p/${esc(r.slug)}">${esc(r.name)}</a></b><p class="mono" style="font-size:11px">${esc(origin)}/badge/${esc(r.slug)}.svg</p></div><img src="/badge/${esc(r.slug)}.svg" width="250" height="55" loading="lazy" alt=""></div>`).join('');
+  const body = `<div class="hero"><div class="lbl">BADGES &middot; LIVE IMAGES FOR YOUR README</div><h1>Show your rank where people look.</h1><p class="sub">Every listed product gets live badges. They update by themselves, link back to your Ranker page, and nobody can buy a rank.</p><p style="margin-top:24px"><a class="btn p" href="/submit" style="padding:12px 20px">Get my badge, free</a></p></div>
+<div style="border-top:1px solid #1E2229;padding-top:28px"><div class="lbl">THE BADGES</div><div class="grid" style="margin-top:18px"><div class="card" style="flex:1 1 300px"><img src="/badge/sample.svg" width="250" height="55" alt="Sample badge"><div style="font-size:15px;font-weight:500;margin:14px 0 4px">Large, 250 px</div><div style="font-size:13px;color:#8A8F98">Body by total stars, rank colour by position: 625 looks.</div></div><div class="card" style="flex:1 1 300px"><img src="/badge/sample.svg?size=small" height="20" alt=""><div style="font-size:15px;font-weight:500;margin:14px 0 4px">Small, 20 px</div><div style="font-size:13px;color:#8A8F98">For tight READMEs.</div></div>${gallery}</div></div>
+<div class="cols"><div class="a"><div class="lbl" style="margin-bottom:12px">EVERY LISTED PRODUCT HAS ONE &middot; ${rows.length}</div>${list}</div><div class="b"><div class="card blue"><div class="lbl">WHY PUT IT THERE</div><div class="kv" style="margin-top:14px"><div>Every visitor to your README sees proof people use you.</div><div>Each click lands on your Ranker page.</div><div>It changes by itself. Rise in the ranking and the badge shows it.</div></div></div></div></div>`;
+  return shell('Badges', body);
 }
 
 export const sampleBadge = (size) => badgeSvg({ rank: 1, stars: 40000, size });

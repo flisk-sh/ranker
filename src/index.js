@@ -3,8 +3,9 @@ import { parseRepo, slugOf, fetchRepo, hasBadge } from './github.js';
 import { trending, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
+import { authRoute, userOf } from './auth.js';
 
-const html = (s, status = 200) => new Response(s, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=60' } });
+const mk = (s, status, who) => new Response(s.replace('<!--USER-->', page.userBox(who)), { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, max-age=0' } });
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
 const svg = (s) => new Response(s, { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'public, max-age=300' } });
 
@@ -42,6 +43,10 @@ export async function handle(req, env, deps = {}) {
   const u = new URL(req.url), path = u.pathname, origin = u.origin, today = dayOf(deps.now());
   const period = PERIODS[u.searchParams.get('period')] ? u.searchParams.get('period') : 'daily';
 
+  const a = await authRoute(req, env, deps.now());
+  if (a) return a;
+  const who = await userOf(req, env);
+  const html = (s, status = 200) => mk(s, status, who);
   if (path === '/health') return json({ ok: true });
   if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n', { headers: { 'content-type': 'text/plain' } });
   if (path === '/icon.svg') return svg(page.ICON);
@@ -78,7 +83,7 @@ export async function handle(req, env, deps = {}) {
     const d = await load(env, today);
     const p = d.products.find((x) => x.slug === m[1]);
     if (!p) return html(page.shell('Not found', '<h1>Not listed.</h1><p class="sub"><a href="/submit" style="text-decoration:underline">Submit it</a>.</p>'), 404);
-    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin));
+    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today)));
   }
 
   if (path === '/compare') {
@@ -87,9 +92,9 @@ export async function handle(req, env, deps = {}) {
     return html(page.compare(want.map((s) => all.find((r) => r.slug === s)).filter(Boolean), d.snaps, all));
   }
   if (path === '/live') return html(page.live());
-  if (path === '/submit') return html(page.submit());
+  if (path === '/submit') return html(page.submit(who));
   if (path === '/badges') { const d = await load(env, today); return html(page.badges(ranked(d, 'daily', today), origin)); }
-  if (path === '/') { const d = await load(env, today); return html(page.home(ranked(d, period, today), period)); }
+  if (path === '/') { const d = await load(env, today); return html(page.home(ranked(d, period, today), period, d.snaps)); }
   return html(page.shell('Not found', '<h1>Not found.</h1>'), 404);
 }
 

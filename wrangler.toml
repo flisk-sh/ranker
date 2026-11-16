@@ -9,6 +9,8 @@ compatibility_date = "2026-11-01"
 
 [vars]
 SUBMITS_PER_DAY = "100"
+# Public half of login.flisk.si signing key (not secret). Secret: SESSION_SECRET.
+LOGIN_PUBLIC_KEY = "g_3cGlqaMDf4mM4Bgfv8EO6js7yW_bcSW7cOUpSwLc0"
 
 [[d1_databases]]
 binding = "DB"
