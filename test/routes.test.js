@@ -83,6 +83,23 @@ test('snapshot job adds today, tomorrow gain ranks the climber first', async () 
   expect(r[0].gain).toBe(40);
 });
 
+test('unknown ?period= is rejected by the API and each row says its period', async () => {
+  const t = setup({ 'acme/run': { stars: 10 } });
+  await t.post('/api/submit', { url: 'https://github.com/acme/run' });
+  const bad = await t.call('/api/trending?period=bogus');
+  expect(bad.status).toBe(400);
+  expect(await bad.json()).toEqual({ error: 'period must be daily, weekly, monthly or yearly' });
+  expect((await t.call('/api/trending?period=')).status).toBe(400);
+  expect((await t.call('/api/trending?period=constructor')).status).toBe(400);
+  const plain = await (await t.call('/api/trending')).json();
+  expect(plain[0].period).toBe('daily');
+  const weekly = await (await t.call('/api/trending?period=WEEKLY')).json();
+  expect(weekly[0].period).toBe('weekly');
+  const badge = await t.call('/badge/acme-run.svg?period=bogus');
+  expect(badge.status).toBe(200);
+  expect(await badge.text()).toContain('#1 Trending');
+});
+
 test('pages and plumbing answer', async () => {
   const t = setup({});
   for (const p of ['/', '/?period=weekly', '/submit', '/badges', '/compare', '/live', '/health', '/robots.txt', '/llms.txt', '/icon.svg']) expect((await t.call(p)).status).toBe(200);

@@ -65,8 +65,9 @@ async function submitProduct(req, env, deps) {
 export async function handle(req, env, deps = {}) {
   deps = { fetch: deps.fetch || fetch, now: deps.now || Date.now };
   const u = new URL(req.url), path = u.pathname, origin = u.origin, today = dayOf(deps.now());
-  const asked = u.searchParams.get('period') || u.searchParams.get('type');
-  const period = PERIODS[asked] ? asked : 'daily';
+  const asked = (u.searchParams.has('period') ? u.searchParams.get('period') : u.searchParams.get('type'))?.toLowerCase() ?? null;
+  const known = asked !== null && Object.hasOwn(PERIODS, asked);
+  const period = known ? asked : 'daily';
 
   const a = await authRoute(req, env, deps.now());
   if (a) return a;
@@ -132,8 +133,9 @@ export async function handle(req, env, deps = {}) {
   }
 
   if (path === '/api/trending') {
+    if (asked !== null && !known) return json({ error: 'period must be daily, weekly, monthly or yearly' }, 400);
     const d = await load(env, today);
-    return json((u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today))).slice(0, 100).map(({ slug, name, repo, stars, gain, rank, verified }) => ({ rank, slug, name, repo, stars, gain, verified: !!verified })));
+    return json((u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today))).slice(0, 100).map(({ slug, name, repo, stars, gain, rank, verified }) => ({ rank, slug, name, repo, stars, gain, verified: !!verified, period })));
   }
 
   m = /^\/badge\/([a-z0-9-]+)\.svg$/.exec(path);
