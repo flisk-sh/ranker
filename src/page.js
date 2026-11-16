@@ -173,6 +173,7 @@ export const srcLogo = (src, n = 36) => {
     : `<span class="pill" style="flex:none;height:fit-content">${esc(src)}</span>`;
 };
 const mrow = (m, who) => { const prod = who && typeof who === 'object' ? who : null; const name = prod ? prod.name : who; return `<div style="display:flex;gap:16px;padding:16px 0;border-top:1px solid #12151A">${srcLogo(m.source)}<div style="flex:1;min-width:0">${name ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">${prod ? mark(prod, 22) : ''}<b style="font-weight:500">${esc(name)}</b></div>` : ''}<a href="${esc(m.url)}" rel="nofollow noopener" style="font-size:15px;line-height:1.45;color:#D5D8DD">${esc(m.text.slice(0, 220))}</a><div class="mono" style="font-size:11px;color:#6B7079;margin-top:6px">${esc(m.author)} &middot; ${esc(m.source)}</div></div><div class="mono" style="font-size:11px;color:#6B7079;flex:none">${ago(m.at)}</div></div>`; };
+const SRC = { hn: 'Hacker News', bluesky: 'Bluesky', x: 'X', reddit: 'Reddit', youtube: 'YouTube' };
 const SOON = '<span class="pill soon">Coming soon</span>';
 const soonBox = (label, text) => `<div class="card"><div class="lbl">${label}</div><p style="margin:10px 0 0;font-size:14px;color:#9AA0AA">${text || 'Coming soon.'}</p></div>`;
 
