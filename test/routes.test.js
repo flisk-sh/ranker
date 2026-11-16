@@ -181,6 +181,15 @@ test('the product page links to the Cilytics scan of its repo', async () => {
   expect(html).toContain('Scanned: CI health + GEL guards');
 });
 
+test('the product page scans the repo in the browser for an OSS score and GEL guards', async () => {
+  const t = setup({ 'acme/run': { stars: 10 } });
+  await t.post('/api/submit', { url: 'https://github.com/acme/run' });
+  const html = await (await t.call('/p/acme-run')).text();
+  expect(html).toContain('id="oss"');
+  expect(html).toContain('https://cilytics.flisk.si/scan.mjs');
+  expect(html).toContain('"acme/run"');
+});
+
 test('ingest-facts needs the key', async () => {
   const t = setup({}, {}, { INGEST_KEY: 'k' });
   const r = await t.call('/api/ingest-facts', { method: 'POST', body: JSON.stringify({ rows: [] }) });
