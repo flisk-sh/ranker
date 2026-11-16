@@ -120,3 +120,10 @@ test('badge ?scope=language ranks inside the language', async () => {
   expect(await get('star-a')).toContain('#2 in Starlark');
   expect(await get('star-b')).toContain('#1 in Starlark');
 });
+
+test('live mentions show the source logo, not initials', async () => {
+  const { live } = await import('../src/page.js');
+  const html = live([{ slug: 'a', name: 'Alpha', repo: 'o/a' }], [{ slug: 'a', source: 'Hacker News', url: 'https://x', text: 't', author: 'u', at: Date.now() }]);
+  expect(html).toContain('aria-label="Hacker News"');
+  expect(html).not.toContain('>HN<');
+});
