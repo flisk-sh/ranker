@@ -35,6 +35,6 @@ Set `GITHUB_TOKEN` as a secret for a higher GitHub rate limit.
 
 ## Routes
 
-`/`, `/p/:slug`, `/submit`, `/badges`, `POST /api/submit`, `POST /api/verify/:slug`, `/api/trending?period=daily|weekly|monthly|yearly`, `/badge/:slug.svg`, `/health`, `/llms.txt`.
+`/`, `/p/:slug`, `/submit`, `/badges`, `POST /api/submit`, `POST /api/verify/:slug`, `/api/trending?period=daily|weekly|monthly|yearly`, `/badge/:slug.svg`, `/health`, `/llms.txt`, `/api/repos` (every tracked repo as `{slug, repo}`, open to any origin so Cilytics can suggest repos to scan).
 
 `GET /api/trending` uses `daily` when `period` (or the legacy `type`) is missing, answers `400 {"error":"period must be daily, weekly, monthly or yearly"}` for an unknown value, and repeats the `period` it ranked by on every row.
