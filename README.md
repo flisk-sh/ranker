@@ -14,7 +14,7 @@ Products ranked by stars gained on GitHub, each with a live README badge.
 [![Flisk Ranker](https://ranker.flisk.si/badge/<slug>.svg)](https://ranker.flisk.si/p/<slug>)
 ```
 
-Options: `?period=daily|weekly|monthly|yearly`, `?size=small`, `?scope=language` (rank among products in the same language, "#1 in Starlark today").
+Options: `?period=daily|weekly|monthly|yearly` (case-insensitive, default: `daily`; the badge falls back to `daily` for any other value), `?size=small`, `?scope=language` (rank among products in the same language, "#1 in Starlark today").
 
 ## Logos and seeding
 
@@ -35,4 +35,6 @@ Set `GITHUB_TOKEN` as a secret for a higher GitHub rate limit.
 
 ## Routes
 
-`/`, `/p/:slug`, `/submit`, `/badges`, `POST /api/submit`, `POST /api/verify/:slug`, `/api/trending?period=`, `/badge/:slug.svg`, `/health`, `/llms.txt`.
+`/`, `/p/:slug`, `/submit`, `/badges`, `POST /api/submit`, `POST /api/verify/:slug`, `/api/trending?period=daily|weekly|monthly|yearly`, `/badge/:slug.svg`, `/health`, `/llms.txt`.
+
+`GET /api/trending` uses `daily` when `period` (or the legacy `type`) is missing, answers `400 {"error":"period must be daily, weekly, monthly or yearly"}` for an unknown value, and repeats the `period` it ranked by on every row.
