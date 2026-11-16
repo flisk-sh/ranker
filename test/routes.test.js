@@ -161,3 +161,13 @@ test('ingest-facts needs the key', async () => {
   const ok = await t.call('/api/ingest-facts', { method: 'POST', headers: { authorization: 'Bearer k' }, body: JSON.stringify({ rows: [] }) });
   expect((await ok.json()).saved).toBe(0);
 });
+
+test('awesome lists are left out of the home list unless asked', async () => {
+  const t = setup({ 'sindresorhus/awesome': { stars: 300 }, 'acme/run': { stars: 10 } });
+  await t.post('/api/submit', { url: 'https://github.com/sindresorhus/awesome' });
+  await t.post('/api/submit', { url: 'https://github.com/acme/run' });
+  const def = await (await t.call('/')).text(), all = await (await t.call('/?awesome=1')).text();
+  expect(def).not.toContain('/p/sindresorhus-awesome');
+  expect(def).toContain('/p/acme-run');
+  expect(all).toContain('/p/sindresorhus-awesome');
+});

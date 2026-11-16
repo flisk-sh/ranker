@@ -30,3 +30,7 @@ export function history(snaps, slug, days = 90, today = dayOf()) {
 }
 
 export const short = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : n >= 1e3 ? (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'k' : String(n));
+
+// Curated link lists ("awesome-…") are not products; the home page leaves them out unless asked.
+export const isAwesome = (p) => /(^|[\/-])awesome(-|$)/i.test(`${p.repo || ''} ${p.slug || ''}`) || /(^|,)(awesome|awesome-list|awesome-lists|awesomelist)(,|$)/i.test(p.topics || '');
+export function withoutAwesome(rows) { return rows.filter((r) => !isAwesome(r)).map((r, i) => ({ ...r, rank: i + 1 })); }

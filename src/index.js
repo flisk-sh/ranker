@@ -1,6 +1,6 @@
 // Flisk Ranker Worker: routes plus the hourly snapshot job.
 import { parseRepo, resolveLink, slugOf, fetchRepo, hasBadge, fetchFacts } from './github.js';
-import { trending, PERIODS, dayOf } from './score.js';
+import { trending, withoutAwesome, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
 import { authRoute, userOf } from './auth.js';
@@ -120,7 +120,7 @@ export async function handle(req, env, deps = {}) {
 
   if (path === '/api/trending') {
     const d = await load(env, today);
-    return json(ranked(d, period, today).slice(0, 100).map(({ slug, name, repo, stars, gain, rank, verified }) => ({ rank, slug, name, repo, stars, gain, verified: !!verified })));
+    return json((u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today))).slice(0, 100).map(({ slug, name, repo, stars, gain, rank, verified }) => ({ rank, slug, name, repo, stars, gain, verified: !!verified })));
   }
 
   m = /^\/badge\/([a-z0-9-]+)\.svg$/.exec(path);
@@ -153,7 +153,7 @@ export async function handle(req, env, deps = {}) {
   if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(ranked(d, 'daily', today), d.mentions)); })();
   if (path === '/submit') return html(page.submit(who));
   if (path === '/badges') { const d = await load(env, today); return html(page.badges(ranked(d, 'daily', today), origin)); }
-  if (path === '/') { const d = await load(env, today); return html(page.home(ranked(d, period, today), period, d.snaps, d.mentions)); }
+  if (path === '/') { const d = await load(env, today); return html(page.home(u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today)), period, d.snaps, d.mentions, u.searchParams.get('awesome') === '1')); }
   return html(page.shell('Not found', '<h1>Not found.</h1>'), 404);
 }
 
