@@ -1,6 +1,6 @@
 // Flisk Ranker Worker: routes plus the hourly snapshot job.
 import { parseRepo, resolveLink, slugOf, fetchRepo, hasBadge, fetchFacts } from './github.js';
-import { trending, PERIODS, dayOf } from './score.js';
+import { trending, withoutAwesome, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
 import { authRoute, userOf } from './auth.js';
@@ -82,9 +82,26 @@ export async function handle(req, env, deps = {}) {
     if (!key || req.headers.get('authorization') !== `Bearer ${key}`) return json({ error: 'No.' }, 401);
     const body = await req.json().catch(() => ({}));
     const rows = (Array.isArray(body.rows) ? body.rows : []).filter((r) => r && typeof r.slug === 'string' && Number.isFinite(r.stars)).slice(0, 500);
+    // The first snapshot ever taken of a product is also its baseline for the day before, so gains show as soon as the next snapshot lands.
     const st = env.DB.prepare('INSERT OR REPLACE INTO snapshots (slug, day, stars, forks) VALUES (?,?,?,?)');
-    for (let i = 0; i < rows.length; i += 90) await env.DB.batch(rows.slice(i, i + 90).map((r) => st.bind(r.slug, today, r.stars | 0, r.forks | 0)));
+    const base = env.DB.prepare('INSERT INTO snapshots (slug, day, stars, forks) SELECT ?1, ?2, ?3, ?4 WHERE NOT EXISTS (SELECT 1 FROM snapshots WHERE slug = ?1 AND day < ?5)');
+    const yday = dayOf(deps.now() - 864e5);
+    for (let i = 0; i < rows.length; i += 45) await env.DB.batch(rows.slice(i, i + 45).flatMap((r) => [base.bind(r.slug, yday, r.stars | 0, r.forks | 0, today), st.bind(r.slug, today, r.stars | 0, r.forks | 0)]));
     return json({ saved: rows.length, day: today });
+  }
+  if (req.method === 'POST' && path === '/api/ingest-facts') {
+    const key = env.INGEST_KEY;
+    if (!key || req.headers.get('authorization') !== `Bearer ${key}`) return json({ error: 'No.' }, 401);
+    const body = await req.json().catch(() => ({}));
+    const rows = (Array.isArray(body.rows) ? body.rows : []).filter((r) => r && typeof r.slug === 'string' && r.facts && typeof r.facts === 'object').slice(0, 200);
+    const now = deps.now();
+    for (let i = 0; i < rows.length; i += 45) {
+      const old = (await env.DB.prepare(`SELECT slug, json FROM facts WHERE slug IN (${rows.slice(i, i + 45).map(() => '?').join(',')})`).bind(...rows.slice(i, i + 45).map((r) => r.slug)).all()).results || [];
+      const prev = Object.fromEntries(old.map((o) => [o.slug, (() => { try { return JSON.parse(o.json); } catch { return {}; } })()]));
+      const st = env.DB.prepare('INSERT OR REPLACE INTO facts (slug, json, at) VALUES (?,?,?)');
+      await env.DB.batch(rows.slice(i, i + 45).map((r) => st.bind(r.slug, JSON.stringify({ ...prev[r.slug], ...r.facts }), now)));
+    }
+    return json({ saved: rows.length });
   }
   if (path === '/health') return json({ ok: true });
   if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n', { headers: { 'content-type': 'text/plain' } });
@@ -105,7 +122,7 @@ export async function handle(req, env, deps = {}) {
   if (path === '/api/trending') {
     if (asked !== null && !known) return json({ error: 'period must be daily, weekly, monthly or yearly' }, 400);
     const d = await load(env, today);
-    return json(ranked(d, period, today).slice(0, 100).map(({ slug, name, repo, stars, gain, rank, verified }) => ({ rank, slug, name, repo, stars, gain, verified: !!verified, period })));
+    return json((u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today))).slice(0, 100).map(({ slug, name, repo, stars, gain, rank, verified }) => ({ rank, slug, name, repo, stars, gain, verified: !!verified, period })));
   }
 
   m = /^\/badge\/([a-z0-9-]+)\.svg$/.exec(path);
@@ -138,7 +155,7 @@ export async function handle(req, env, deps = {}) {
   if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(ranked(d, 'daily', today), d.mentions)); })();
   if (path === '/submit') return html(page.submit(who));
   if (path === '/badges') { const d = await load(env, today); return html(page.badges(ranked(d, 'daily', today), origin)); }
-  if (path === '/') { const d = await load(env, today); return html(page.home(ranked(d, period, today), period, d.snaps, d.mentions)); }
+  if (path === '/') { const d = await load(env, today); return html(page.home(u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today)), period, d.snaps, d.mentions, u.searchParams.get('awesome') === '1')); }
   return html(page.shell('Not found', '<h1>Not found.</h1>'), 404);
 }
 
