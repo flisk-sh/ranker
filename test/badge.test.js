@@ -45,3 +45,8 @@ test('long text scrolls inside the box, short text stays still', () => {
   expect(long).toContain('animateTransform attributeName="transform" type="translate"');
   expect(badgeSvg({ rank: 3, stars: 5, size: 'large' })).not.toContain('type="translate"');
 });
+
+test('a language badge says the rank inside the language', () => {
+  expect(badgeSvg({ rank: 1, stars: 10, lang: 'Starlark' })).toContain('#1 in Starlark today');
+  expect(embed('https://r.si', 'a-b', { scope: 'language' }).url).toBe('https://r.si/badge/a-b.svg?scope=language');
+});

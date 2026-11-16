@@ -108,3 +108,15 @@ test('compare shows the chosen products side by side', async () => {
   expect(h).toContain(' vs ');
   expect(await (await t.call('/compare')).text()).toContain('Pick two to four');
 });
+
+test('badge ?scope=language ranks inside the language', async () => {
+  const { fakeD1 } = await import('./fake-d1.js');
+  const { handle } = await import('../src/index.js');
+  const env = { DB: fakeD1() };
+  const day = new Date().toISOString().slice(0, 10);
+  const add = (slug, lang, stars, base) => { env.DB.raw.run('INSERT INTO products (slug, repo, name, tagline, homepage, license, language, topics, verified, created) VALUES (?,?,?,?,?,?,?,?,0,?)', [slug, `o/${slug}`, slug, '', '', '', lang, '', 1]); env.DB.raw.run('INSERT INTO snapshots VALUES (?,?,?,0)', [slug, new Date(Date.now() - 864e5).toISOString().slice(0, 10), base]); env.DB.raw.run('INSERT INTO snapshots VALUES (?,?,?,0)', [slug, day, stars]); };
+  add('big-js', 'JavaScript', 900, 100); add('star-a', 'Starlark', 50, 40); add('star-b', 'Starlark', 20, 5);
+  const get = async (slug) => (await handle(new Request(`https://r.si/badge/${slug}.svg?scope=language`), env, {})).text();
+  expect(await get('star-a')).toContain('#2 in Starlark');
+  expect(await get('star-b')).toContain('#1 in Starlark');
+});

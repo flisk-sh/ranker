@@ -14,7 +14,7 @@ Products ranked by stars gained on GitHub, each with a live README badge.
 [![Flisk Ranker](https://ranker.flisk.si/badge/<slug>.svg)](https://ranker.flisk.si/p/<slug>)
 ```
 
-Options: `?period=daily|weekly|monthly|yearly`, `?size=small`.
+Options: `?period=daily|weekly|monthly|yearly`, `?size=small`, `?scope=language` (rank among products in the same language, "#1 in Starlark today").
 
 ## Logos and seeding
 
