@@ -112,7 +112,7 @@ export async function handle(req, env, deps = {}) {
   if (hm) {
     if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ error: 'Hourly history is not switched on yet.' }, 503);
     const sql = `SELECT intDiv(toUInt32(timestamp), 3600) * 3600 AS t, max(double1) AS stars FROM ranker_stars WHERE index1 = '${hm[1].replace(/[^\w-]/g, '')}' AND timestamp > NOW() - INTERVAL '7' DAY GROUP BY t ORDER BY t FORMAT JSON`;
-    const r = await deps.fetch(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/analytics_engine/sql`, { method: 'POST', headers: { authorization: `Bearer ${env.CF_API_TOKEN}` }, body: sql }).catch(() => null);
+    const f = deps.fetch, r = await f(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/analytics_engine/sql`, { method: 'POST', headers: { authorization: `Bearer ${env.CF_API_TOKEN}` }, body: sql }).catch(() => null);
     return json(r?.ok ? ((await r.json()).data || []) : { error: 'Hourly history did not answer.' }, r?.ok ? 200 : 502);
   }
   if (path === '/health') return json({ ok: true });
