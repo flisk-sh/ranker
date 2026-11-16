@@ -4,7 +4,7 @@ import { trending, withoutAwesome, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
 import { authRoute, userOf } from './auth.js';
-import { refreshMentions, phrasesOf } from './mentions.js';
+import { refreshMentions, pulse, phrasesOf } from './mentions.js';
 
 const mk = (s, status, who) => new Response(s.replace('<!--USER-->', page.userBox(who)), { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, max-age=0' } });
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
@@ -168,6 +168,13 @@ export async function handle(req, env, deps = {}) {
     const want = (u.searchParams.get('p') || '').split(',').filter(Boolean).slice(0, 4);
     return html(page.compare(want.map((s) => all.find((r) => r.slug === s)).filter(Boolean), d.snaps, all, d.facts, d.mentions));
   }
+  if (path === '/api/mentions') {
+    const n = Math.min(60, Math.max(1, Number(u.searchParams.get('limit')) || 10));
+    const ms = (await env.DB.prepare('SELECT url, slug, source, text, author, at FROM mentions ORDER BY at DESC LIMIT ?').bind(n).all()).results || [];
+    const sl = [...new Set(ms.map((x) => x.slug))];
+    const ps = sl.length ? (await env.DB.prepare('SELECT * FROM products WHERE slug IN (' + sl.map(() => '?').join(',') + ')').bind(...sl).all()).results || [] : [];
+    return json({ items: page.mentionItems(ms, ps) });
+  }
   if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(ranked(d, 'daily', today), d.mentions)); })();
   if (path === '/submit') return html(page.submit(who));
   if (path === '/badges') { const d = await load(env, today); return html(page.badges(ranked(d, 'daily', today), origin)); }
@@ -216,6 +223,6 @@ export async function tick(env, deps = {}) {
 }
 
 export default {
-  fetch: (req, env, ctx) => { ctx?.waitUntil?.(tick(env).catch(() => 0)); return handle(req, env); },
+  fetch: (req, env, ctx) => { ctx?.waitUntil?.(tick(env).catch(() => 0)); if (new URL(req.url).pathname === '/api/mentions') ctx?.waitUntil?.(pulse(env).catch(() => 0)); return handle(req, env); },
   scheduled: (_e, env, ctx) => ctx.waitUntil(snapshot(env)),
 };

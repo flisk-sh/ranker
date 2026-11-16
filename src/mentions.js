@@ -34,11 +34,11 @@ export function matches(text, phrases) {
 }
 
 // Looks for the products checked longest ago, a few per call (the Worker allows 50 outgoing requests).
-export async function refreshMentions(env, deps = {}, max = 8) {
+export async function refreshMentions(env, deps = {}, max = 8, ttl = 36e5) {
   const f = deps.fetch || fetch, now = (deps.now || Date.now)();
   const ps = (await env.DB.prepare('SELECT slug, repo, homepage FROM products').all()).results || [];
   const seen = Object.fromEntries(((await env.DB.prepare("SELECT day, n FROM days WHERE day LIKE 'm-%'").all()).results || []).map((r) => [r.day, r.n]));
-  const due = ps.filter((p) => now - (seen['m-' + p.slug] || 0) > 36e5).sort((a, b) => (seen['m-' + a.slug] || 0) - (seen['m-' + b.slug] || 0)).slice(0, max);
+  const due = ps.filter((p) => now - (seen['m-' + p.slug] || 0) > ttl).sort((a, b) => (seen['m-' + a.slug] || 0) - (seen['m-' + b.slug] || 0)).slice(0, max);
   let added = 0;
   for (const p of due) {
     const phrases = phrasesOf(p), since = now - 30 * 864e5;
@@ -51,4 +51,13 @@ export async function refreshMentions(env, deps = {}, max = 8) {
     await env.DB.prepare('INSERT OR REPLACE INTO days (day, n) VALUES (?, ?)').bind('m-' + p.slug, now).run();
   }
   return added;
+}
+
+// While someone watches the live list, look for a few more products at most every 20 seconds, each at most every 10 minutes.
+export async function pulse(env, deps = {}) {
+  const now = (deps.now || Date.now)();
+  await env.DB.prepare("INSERT OR IGNORE INTO days (day, n) VALUES ('mp', 0)").run();
+  const got = await env.DB.prepare("UPDATE days SET n = ? WHERE day = 'mp' AND n < ?").bind(now, now - 2e4).run();
+  if (!got.meta?.changes) return -1;
+  return refreshMentions(env, deps, 5, 6e5).catch(() => 0);
 }
