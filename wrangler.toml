@@ -17,6 +17,11 @@ binding = "DB"
 database_name = "flisk-ranker"
 database_id = "f034d409-6e64-4c0e-98cd-ad0abffc722a"
 
+# Hourly star points (3 months kept, free plan: 100k writes a day). Daily history stays in D1.
+[[analytics_engine_datasets]]
+binding = "STARS"
+dataset = "ranker_stars"
+
 [[routes]]
 pattern = "ranker.flisk.si"
 custom_domain = true

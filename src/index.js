@@ -84,6 +84,12 @@ export async function handle(req, env, deps = {}) {
     // The first snapshot ever taken of a product is also its baseline for the day before, so gains show as soon as the next snapshot lands.
     const st = env.DB.prepare('INSERT OR REPLACE INTO snapshots (slug, day, stars, forks) VALUES (?,?,?,?)');
     const base = env.DB.prepare('INSERT INTO snapshots (slug, day, stars, forks) SELECT ?1, ?2, ?3, ?4 WHERE NOT EXISTS (SELECT 1 FROM snapshots WHERE slug = ?1 AND day < ?5)');
+    // Hourly points go to Analytics Engine, only for products whose count changed (250 points per request at most).
+    if (env.STARS) {
+      const marks = rows.slice(0, 200).map(() => '?').join(',');
+      const was = Object.fromEntries(((await env.DB.prepare(`SELECT slug, stars FROM snapshots WHERE day = ? AND slug IN (${marks})`).bind(today, ...rows.slice(0, 200).map((r) => r.slug)).all()).results || []).map((o) => [o.slug, o.stars]));
+      for (const r of rows.slice(0, 200)) if (was[r.slug] !== (r.stars | 0)) env.STARS.writeDataPoint({ indexes: [r.slug], blobs: [r.slug], doubles: [r.stars | 0, r.forks | 0] });
+    }
     const yday = dayOf(deps.now() - 864e5);
     for (let i = 0; i < rows.length; i += 45) await env.DB.batch(rows.slice(i, i + 45).flatMap((r) => [base.bind(r.slug, yday, r.stars | 0, r.forks | 0, today), st.bind(r.slug, today, r.stars | 0, r.forks | 0)]));
     return json({ saved: rows.length, day: today });
@@ -101,6 +107,13 @@ export async function handle(req, env, deps = {}) {
       await env.DB.batch(rows.slice(i, i + 45).map((r) => st.bind(r.slug, JSON.stringify({ ...prev[r.slug], ...r.facts }), now)));
     }
     return json({ saved: rows.length });
+  }
+  const hm = /^\/api\/hourly\/([\w-]+)$/.exec(path);
+  if (hm) {
+    if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ error: 'Hourly history is not switched on yet.' }, 503);
+    const sql = `SELECT intDiv(toUInt32(timestamp), 3600) * 3600 AS t, max(double1) AS stars FROM ranker_stars WHERE index1 = '${hm[1].replace(/[^\w-]/g, '')}' AND timestamp > NOW() - INTERVAL '7' DAY GROUP BY t ORDER BY t FORMAT JSON`;
+    const r = await deps.fetch(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/analytics_engine/sql`, { method: 'POST', headers: { authorization: `Bearer ${env.CF_API_TOKEN}` }, body: sql }).catch(() => null);
+    return json(r?.ok ? ((await r.json()).data || []) : { error: 'Hourly history did not answer.' }, r?.ok ? 200 : 502);
   }
   if (path === '/health') return json({ ok: true });
   if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n', { headers: { 'content-type': 'text/plain' } });

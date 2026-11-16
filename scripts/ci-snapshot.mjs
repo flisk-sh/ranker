@@ -11,8 +11,8 @@ for (let i = 0; i < list.length; i += 100) {
   const j = await r.json();
   chunk.forEach((p, n) => { const v = j.data?.[`r${n}`]; if (v) rows.push({ slug: p.slug, stars: v.stargazerCount, forks: v.forkCount }); });
 }
-for (let i = 0; i < rows.length; i += 400) {
-  const r = await fetch(`${base}/api/ingest`, { method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify({ rows: rows.slice(i, i + 400) }) });
+for (let i = 0; i < rows.length; i += 200) {
+  const r = await fetch(`${base}/api/ingest`, { method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify({ rows: rows.slice(i, i + 200) }) });
   if (!r.ok) { console.error('ingest failed', r.status, await r.text()); process.exit(1); }
 }
 console.log(`snapshot saved for ${rows.length} of ${list.length} repos`);
