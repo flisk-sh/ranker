@@ -2,7 +2,8 @@
 // Reddit, X and YouTube block servers, so they are not read. A post counts only when the repo name or the
 // site address appears in it as written.
 const UA = 'FliskRanker/1.0 (+https://ranker.flisk.si)';
-const clip = (v, n) => String(v ?? '').replace(/<[^>]+>/g, ' ').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim().slice(0, n);
+const ent = (t) => t.replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d)).replace(/&quot;/g, '"').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
+const clip = (v, n) => ent(ent(String(v ?? '').replace(/<[^>]+>/g, ' '))).replace(/\s+/g, ' ').trim().slice(0, n);
 
 async function getJson(f, url) {
   try { const r = await f(url, { headers: { accept: 'application/json', 'user-agent': UA }, signal: AbortSignal.timeout(8000) }); return r.ok ? await r.json() : null; } catch { return null; }

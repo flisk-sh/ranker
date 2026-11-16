@@ -42,3 +42,20 @@ export async function hasBadge(repo, slug, { fetch: f = fetch, origin = 'https:/
   const text = await r.text().catch(() => '');
   return text.includes(`${new URL(origin).host}/badge/${slug}.svg`);
 }
+
+// Activity numbers for the product page: merged PRs and closed issues in 30 days, releases in 12 weeks,
+// the last release, and commits per week for 12 weeks. Fields GitHub does not answer stay null.
+export async function fetchFacts(repo, { fetch: f = fetch, env, now = Date.now() } = {}) {
+  const h = headers(env), since = new Date(now - 30 * 864e5).toISOString().slice(0, 10);
+  const get = async (u) => { const r = await f(`https://api.github.com/${u}`, { headers: h }).catch(() => null); return r?.ok ? r.json().catch(() => null) : null; };
+  const count = async (q) => (await get(`search/issues?per_page=1&q=${encodeURIComponent(`repo:${repo} ${q}`)}`))?.total_count ?? null;
+  const [prs, issues, rel, act] = await Promise.all([count(`is:pr is:merged merged:>=${since}`), count(`is:issue is:closed closed:>=${since}`), get(`repos/${repo}/releases?per_page=30`), get(`repos/${repo}/stats/commit_activity`)]);
+  const rels = Array.isArray(rel) ? rel.filter((r) => !r.draft) : null;
+  const weeks = Array.isArray(act) && act.length >= 12 ? act.slice(-12).map((w) => w.total || 0) : null;
+  return {
+    prs, issues,
+    releases: rels ? rels.filter((r) => Date.parse(r.published_at) > now - 84 * 864e5).length : null,
+    last: rels?.[0] ? { tag: String(rels[0].tag_name || '').slice(0, 40), at: Date.parse(rels[0].published_at) || 0 } : null,
+    commits: weeks,
+  };
+}

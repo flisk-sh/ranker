@@ -1,5 +1,5 @@
 // Flisk Ranker Worker: routes plus the hourly snapshot job.
-import { parseRepo, slugOf, fetchRepo, hasBadge } from './github.js';
+import { parseRepo, slugOf, fetchRepo, hasBadge, fetchFacts } from './github.js';
 import { trending, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
@@ -15,7 +15,8 @@ async function load(env, today) {
   const from = new Date(Date.parse(today + 'T00:00:00Z') - 400 * 864e5).toISOString().slice(0, 10);
   const snaps = (await env.DB.prepare('SELECT slug, day, stars, forks FROM snapshots WHERE day >= ?').bind(from).all()).results || [];
   const mentions = (await env.DB.prepare('SELECT m.url, m.slug, m.source, m.text, m.author, m.at FROM mentions m WHERE m.at > ? ORDER BY m.at DESC LIMIT 300').bind(Date.now() - 30 * 864e5).all()).results || [];
-  return { products, snaps, mentions };
+  const facts = Object.fromEntries(((await env.DB.prepare('SELECT slug, json FROM facts').all()).results || []).map((r) => { try { return [r.slug, JSON.parse(r.json)]; } catch { return [r.slug, null]; } }));
+  return { products, snaps, mentions, facts };
 }
 const ranked = (d, period, today) => trending(d.products, d.snaps, period, today);
 
@@ -85,13 +86,13 @@ export async function handle(req, env, deps = {}) {
     const d = await load(env, today);
     const p = d.products.find((x) => x.slug === m[1]);
     if (!p) return html(page.shell('Not found', '<h1>Not listed.</h1><p class="sub"><a href="/submit" style="text-decoration:underline">Submit it</a>.</p>'), 404);
-    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank])), d.mentions.filter((m) => m.slug === p.slug)));
+    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank])), d.mentions.filter((m) => m.slug === p.slug), d.facts[p.slug]));
   }
 
   if (path === '/compare') {
     const d = await load(env, today), all = ranked(d, 'daily', today);
     const want = (u.searchParams.get('p') || '').split(',').filter(Boolean).slice(0, 4);
-    return html(page.compare(want.map((s) => all.find((r) => r.slug === s)).filter(Boolean), d.snaps, all));
+    return html(page.compare(want.map((s) => all.find((r) => r.slug === s)).filter(Boolean), d.snaps, all, d.facts, d.mentions));
   }
   if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(ranked(d, 'daily', today), d.mentions)); })();
   if (path === '/submit') return html(page.submit(who));
@@ -104,7 +105,7 @@ export async function handle(req, env, deps = {}) {
 export async function snapshot(env, deps = {}) {
   deps = { fetch: deps.fetch || fetch, now: deps.now || Date.now };
   const today = dayOf(deps.now());
-  const todo = (await env.DB.prepare('SELECT p.slug, p.repo, p.verified FROM products p WHERE NOT EXISTS (SELECT 1 FROM snapshots s WHERE s.slug = p.slug AND s.day = ?) LIMIT 40').bind(today).all()).results || [];
+  const todo = (await env.DB.prepare('SELECT p.slug, p.repo, p.verified FROM products p WHERE NOT EXISTS (SELECT 1 FROM snapshots s WHERE s.slug = p.slug AND s.day = ?) LIMIT 28').bind(today).all()).results || [];
   let done = 0;
   for (const p of todo) {
     const r = await fetchRepo(p.repo, { fetch: deps.fetch, env });
@@ -115,13 +116,28 @@ export async function snapshot(env, deps = {}) {
   return done;
 }
 
+// Activity facts for the two products checked longest ago (4 outside calls each).
+export async function refreshFacts(env, deps = {}, max = 2) {
+  const f = deps.fetch || fetch, now = (deps.now || Date.now)();
+  const rows = (await env.DB.prepare('SELECT p.slug, p.repo, x.at FROM products p LEFT JOIN facts x ON x.slug = p.slug ORDER BY COALESCE(x.at, 0) ASC LIMIT ?').bind(max).all()).results || [];
+  let n = 0;
+  for (const p of rows) {
+    if (p.at && now - p.at < 6 * 36e5) continue;
+    const j = await fetchFacts(p.repo, { fetch: f, env, now });
+    await env.DB.prepare('INSERT OR REPLACE INTO facts (slug, json, at) VALUES (?,?,?)').bind(p.slug, JSON.stringify(j), now).run();
+    n++;
+  }
+  return n;
+}
+
 // The free plan has no spare cron triggers, so the first visit each hour runs the snapshot job.
 export async function tick(env, deps = {}) {
   const hour = new Date((deps.now || Date.now)()).toISOString().slice(0, 13);
   const r = await env.DB.prepare('INSERT OR IGNORE INTO days (day, n) VALUES (?, 1)').bind('run-' + hour).run();
   if (!r.meta?.changes) return 0;
   const n = await snapshot(env, deps);
-  await refreshMentions(env, deps).catch(() => 0);
+  await refreshMentions(env, deps, 6).catch(() => 0);
+  await refreshFacts(env, deps).catch(() => 0);
   return n;
 }
 
