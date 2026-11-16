@@ -116,6 +116,14 @@ export async function handle(req, env, deps = {}) {
     }
     return json({ saved: rows.length });
   }
+  if (path === '/api/search') {
+    const qs = (u.searchParams.get('q') || '').trim().toLowerCase().slice(0, 60);
+    if (qs.length < 2) return json({ n: 0, total: 0, html: '' });
+    const d = await load(env, today);
+    const all = withoutAwesome(ranked(d, period, today));
+    const hit = all.filter((r) => [r.name, r.repo, r.tagline, r.slug].some((x) => String(x || '').toLowerCase().includes(qs)));
+    return json({ n: hit.length, total: all.length, html: hit.slice(0, 30).map((r) => page.rowHtml(r, d.snaps, d.mentions, period)).join('') });
+  }
   const hm = /^\/api\/hourly\/([\w-]+)$/.exec(path);
   if (hm) {
     if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ error: 'Hourly history is not switched on yet.' }, 503);
