@@ -5,6 +5,7 @@ import { badgeSvg } from './badge.js';
 import * as page from './page.js';
 import { authRoute, userOf } from './auth.js';
 import { refreshMentions, pulse, phrasesOf } from './mentions.js';
+import { withSecurityHeaders } from './security-headers.js';
 
 const mk = (s, status, who) => new Response(s.replace('<!--USER-->', page.userBox(who)), { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, max-age=0' } });
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
@@ -256,6 +257,6 @@ export async function tick(env, deps = {}) {
 }
 
 export default {
-  fetch: (req, env, ctx) => { ctx?.waitUntil?.(tick(env).catch(() => 0)); if (new URL(req.url).pathname === '/api/mentions') ctx?.waitUntil?.(pulse(env).catch(() => 0)); return handle(req, env); },
+  fetch: async (req, env, ctx) => { ctx?.waitUntil?.(tick(env).catch(() => 0)); if (new URL(req.url).pathname === '/api/mentions') ctx?.waitUntil?.(pulse(env).catch(() => 0)); return withSecurityHeaders(await handle(req, env)); },
   scheduled: (_e, env, ctx) => ctx.waitUntil(snapshot(env)),
 };
