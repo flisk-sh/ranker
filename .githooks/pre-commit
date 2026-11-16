@@ -1,0 +1,5 @@
+#!/bin/sh
+# Syntax-check every source file, then run the tests.
+set -e
+for f in src/*.js scripts/*.mjs test/*.js; do bun build --no-bundle "$f" >/dev/null || { echo "pre-commit: syntax error in $f"; exit 1; }; done
+bun test

@@ -1,0 +1,2 @@
+#!/bin/sh
+grep -q '^Signed-off-by: ' "$1" || { echo "commit-msg: sign off your commit (git commit -s)"; exit 1; }

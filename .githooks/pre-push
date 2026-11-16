@@ -1,0 +1,5 @@
+#!/bin/sh
+# Build the Worker the way deploy does, without deploying.
+set -e
+bunx wrangler@4 deploy --dry-run --outdir .wrangler/dry >/dev/null
+echo "pre-push: Worker builds"

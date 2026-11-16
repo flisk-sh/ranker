@@ -1,0 +1,11 @@
+{
+  "name": "flisk-ranker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "dev": "bun scripts/dev.mjs",
+    "deploy": "bunx wrangler@4 deploy",
+    "prepare": "git config core.hooksPath .githooks"
+  }
+}
