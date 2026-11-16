@@ -169,6 +169,16 @@ test('ingest needs the key and saves today\'s snapshot', async () => {
   expect((await ok.json()).saved).toBe(1);
   const list = await (await t.call('/api/repos')).json();
   expect(list[0].repo).toBe('acme/run');
+  // Cilytics fetches this list from another origin.
+  expect((await t.call('/api/repos')).headers.get('access-control-allow-origin')).toBe('*');
+});
+
+test('the product page links to the Cilytics scan of its repo', async () => {
+  const t = setup({ 'acme/run': { stars: 10 } });
+  await t.post('/api/submit', { url: 'https://github.com/acme/run' });
+  const html = await (await t.call('/p/acme-run')).text();
+  expect(html).toContain('https://cilytics.flisk.si/?repo=acme/run');
+  expect(html).toContain('Scanned: CI health + GEL guards');
 });
 
 test('ingest-facts needs the key', async () => {

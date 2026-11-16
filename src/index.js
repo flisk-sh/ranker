@@ -75,7 +75,11 @@ export async function handle(req, env, deps = {}) {
   const html = (s, status = 200) => mk(s, status, who);
   if (path === '/api/repos') {
     const { results } = await env.DB.prepare('SELECT slug, repo FROM products').all();
-    return json(results);
+    // Public list of the repos Ranker tracks; Cilytics reads it from the browser to suggest what to scan.
+    const r = json(results);
+    r.headers.set('access-control-allow-origin', '*');
+    r.headers.set('cache-control', 'public, max-age=300');
+    return r;
   }
   if (req.method === 'POST' && path === '/api/ingest') {
     const key = env.INGEST_KEY;
