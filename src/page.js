@@ -82,12 +82,11 @@ export function rowHtml(r, snaps, ments, period, attr = '') {
   return `<div class="row"${attr} data-t="${esc((r.name + ' ' + r.tagline + ' ' + r.repo).toLowerCase())}" data-c="${esc(r.topics || '')}" data-l="${esc(r.language || '')}" data-v="${r.verified ? 1 : 0}" data-s="${r.stars | 0}" data-g="${r.gain > 0 ? 1 : 0}"><span class="n">${r.rank}</span>${mark(r)}<div class="m"><b><a href="/p/${esc(r.slug)}">${esc(r.name)}</a></b> <span class="pill">Repo</span>${r.verified ? ' <span class="pill ok">&#10003; VERIFIED</span>' : ''}${r.isNew ? ' <span class="pill">NEW</span>' : ''}<p>${esc(r.tagline)}</p><div style="margin-top:6px"><span class="lbl">MENTIONED ON</span> ${[...new Set(by(r.slug).map((m) => SRC[m.source] || m.source))].map((x) => `<span class="pill">${esc(x)}</span>`).join(' ') || '<span class="pill">none yet</span>'} ${[r.license, r.language].filter(Boolean).map((x) => `<span class="pill">${esc(x)}</span>`).join(' ')} <span class="pill">&#9733; ${short(r.stars)}</span> <span class="pill">&#9095; ${short(r.forks || 0)}</span> <span class="pill soon">Price: coming soon</span> <a class="pill" href="/compare?p=${esc(r.slug)}">Compare</a></div></div>${line(starsOf(snaps, r.slug))}<div class="g">${gainTxt(r)}<small>${r.isNew ? 'first day' : PLAB[period]}</small></div></div>`;
 }
 
-export function home(rows, period, snaps = [], ments = [], awesome = false) {
-  const by = (slug) => ments.filter((m) => m.slug === slug);
+export function home(rows, period, snaps = [], ments = [], awesome = false, pairs = null) {
   const stars = rows.reduce((a, r) => a + r.stars, 0), gain = rows.reduce((a, r) => a + Math.max(0, r.gain), 0), ver = rows.filter((r) => r.verified).length;
   const tabs = PER.map(([k, l]) => `<a href="/?period=${k}" class="pill ${k === period ? 'on' : ''}">${l}</a>`).join(' ');
   const list = rows.length
-    ? rows.slice(0, 100).map((r, i) => rowHtml(r, snaps, ments, period, i >= 50 ? ' hidden data-more="1"' : '')).join('')
+    ? rows.slice(0, 100).map((r, i) => rowHtml(r, snaps, pairs || ments, period, i >= 50 ? ' hidden data-more="1"' : '')).join('')
     : '<p class="sub" style="padding:24px 0">No products yet. <a href="/submit" style="text-decoration:underline">Be the first</a>.</p>';
   const langs = [...new Set(rows.map((r) => r.language).filter(Boolean))].sort();
   const sample = rows[0]?.slug || 'sample';

@@ -10,6 +10,18 @@ const mk = (s, status, who) => new Response(s.replace('<!--USER-->', page.userBo
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
 const svg = (s) => new Response(s, { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'public, max-age=300' } });
 
+const MCOLS = 'url, slug, source, text, author, at';
+async function mentionsOf(env, slugs) {
+  const out = [], since = Date.now() - 30 * 864e5;
+  for (let i = 0; i < slugs.length; i += 90) {
+    const part = slugs.slice(i, i + 90);
+    out.push(...((await env.DB.prepare(`SELECT ${MCOLS} FROM mentions WHERE at > ? AND slug IN (${part.map(() => '?').join(',')}) ORDER BY at DESC LIMIT 200`).bind(since, ...part).all()).results || []));
+  }
+  return out;
+}
+async function loadPairs(env) {
+  return (await env.DB.prepare('SELECT DISTINCT slug, source FROM mentions WHERE at > ?').bind(Date.now() - 30 * 864e5).all()).results || [];
+}
 async function load(env, today) {
   const products = (await env.DB.prepare('SELECT * FROM products').all()).results || [];
   const from = new Date(Date.parse(today + 'T00:00:00Z') - 400 * 864e5).toISOString().slice(0, 10);
@@ -118,7 +130,8 @@ export async function handle(req, env, deps = {}) {
     const d = await load(env, today);
     const all = withoutAwesome(ranked(d, period, today));
     const hit = all.filter((r) => [r.name, r.repo, r.tagline, r.slug].some((x) => String(x || '').toLowerCase().includes(qs)));
-    return json({ n: hit.length, total: all.length, html: hit.slice(0, 30).map((r) => page.rowHtml(r, d.snaps, d.mentions, period)).join('') });
+    const pairs = await loadPairs(env);
+    return json({ n: hit.length, total: all.length, html: hit.slice(0, 30).map((r) => page.rowHtml(r, d.snaps, pairs, period)).join('') });
   }
   const hm = /^\/api\/hourly\/([\w-]+)$/.exec(path);
   if (hm) {
@@ -168,13 +181,13 @@ export async function handle(req, env, deps = {}) {
     const d = await load(env, today);
     const p = d.products.find((x) => x.slug === m[1]);
     if (!p) return html(page.shell('Not found', '<h1>Not listed.</h1><p class="sub"><a href="/submit" style="text-decoration:underline">Submit it</a>.</p>'), 404);
-    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), await rankExtras(d, p, today, Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank]))), d.mentions.filter((m) => m.slug === p.slug), d.facts[p.slug]));
+    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), await rankExtras(d, p, today, Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank]))), await mentionsOf(env, [p.slug]), d.facts[p.slug]));
   }
 
   if (path === '/compare') {
     const d = await load(env, today), all = ranked(d, 'daily', today);
     const want = (u.searchParams.get('p') || '').split(',').filter(Boolean).slice(0, 4);
-    return html(page.compare(want.map((s) => all.find((r) => r.slug === s)).filter(Boolean), d.snaps, all, d.facts, d.mentions));
+    return html(page.compare(want.map((s) => all.find((r) => r.slug === s)).filter(Boolean), d.snaps, all, d.facts, await mentionsOf(env, want)));
   }
   if (path === '/api/mentions') {
     const n = Math.min(60, Math.max(1, Number(u.searchParams.get('limit')) || 10));
@@ -186,7 +199,7 @@ export async function handle(req, env, deps = {}) {
   if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(ranked(d, 'daily', today), d.mentions)); })();
   if (path === '/submit') return html(page.submit(who));
   if (path === '/badges') { const d = await load(env, today); return html(page.badges(ranked(d, 'daily', today), origin)); }
-  if (path === '/') { const d = await load(env, today); return html(page.home(u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today)), period, d.snaps, d.mentions, u.searchParams.get('awesome') === '1')); }
+  if (path === '/') { const d = await load(env, today); return html(page.home(u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today)), period, d.snaps, d.mentions, u.searchParams.get('awesome') === '1', await loadPairs(env))); }
   return html(page.shell('Not found', '<h1>Not found.</h1>'), 404);
 }
 
