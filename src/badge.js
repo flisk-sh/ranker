@@ -4,6 +4,17 @@ export const BODIES = ['Dust', 'Pebble', 'Asteroid', 'Moon', 'Rocky planet', 'Ic
 export const RANKS = ['Recruit', 'Seaman', 'Able seaman', 'Leading seaman', 'Senior seaman', 'Petty officer', 'Senior petty officer', 'Chief petty officer', 'Senior chief', 'Master chief', 'Warrant officer', 'Midshipman', 'Ensign', 'Sub-lieutenant', 'Lieutenant', 'Lt commander', 'Commander', 'Captain', 'Commodore', 'Rear admiral', 'Vice admiral', 'Admiral', 'Fleet admiral', 'Admiral of the fleet', 'Grand admiral'];
 export const METALS = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'];
 const METAL = ['#D08A4C', '#C3CAD6', '#F5C451', '#7FE3FF', '#B58CFF'];
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// "on 16 Nov", "week of 9 Nov", "in Nov 2026", "in 2026"; the old words when no day is given.
+function whenOf(period, day) {
+  const t = Date.parse(`${day}T00:00:00Z`);
+  if (!day || Number.isNaN(t)) return WORDS[period] || WORDS.daily;
+  const d = new Date(t), dm = (x) => `${x.getUTCDate()} ${MON[x.getUTCMonth()]}`;
+  if (period === 'weekly') return `week of ${dm(new Date(t - 6 * 864e5))}`;
+  if (period === 'monthly') return `in ${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  if (period === 'yearly') return `in ${d.getUTCFullYear()}`;
+  return `on ${dm(d)}`;
+}
 const WORDS = { daily: 'today', weekly: 'this week', monthly: 'this month', yearly: 'this year' };
 
 // Row from total stars: 0 stars is dust, about 100k stars is a galaxy.
@@ -43,10 +54,10 @@ const STARS = [[70, 9, 0.8, 3], [118, 47, 0.7, 2.4], [176, 8, 0.8, 3.6], [205, 4
 const twinkle = (x, y, r, d, i) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff"><animate attributeName="opacity" values="1;.1;1" dur="${d}s" begin="-${f2(i * 0.4)}s" repeatCount="indefinite"/></circle>`;
 
 // input: { rank, stars, period, label? }. Returns the SVG text.
-export function badgeSvg({ rank = 0, stars = 0, period = 'daily', size = 'large', label, lang } = {}) {
+export function badgeSvg({ rank = 0, stars = 0, period = 'daily', size = 'large', label, lang, day } = {}) {
   const r = bodyOf(stars), c = rankOf(rank), m = METAL[Math.floor(c / 5)];
-  const when = WORDS[period] || WORDS.daily;
-  const main = label || (rank > 0 ? (lang ? `#${rank} in ${lang} ${when}` : `#${rank} Trending ${when}`) : 'Listed on Ranker');
+  const when = whenOf(period, day);
+  const main = label || (rank > 0 ? `#${rank} Trending ${when} \u00b7 ${lang || 'all languages'}` : 'Listed on Ranker');
   const title = `Flisk Ranker: ${main}. ${RANKS[c]}, ${BODIES[r]}.`;
   if (size === 'small') {
     const w = Math.ceil((main.length + 7) * 6.3) + 56;

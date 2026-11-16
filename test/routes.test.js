@@ -30,7 +30,7 @@ test('submit imports the repo, lists it and serves its badge', async () => {
   expect(page).toContain('Check my README');
   const b = await t.call('/badge/acme-run.svg');
   expect(b.headers.get('content-type')).toContain('image/svg+xml');
-  expect(await b.text()).toContain('#1 Trending today');
+  expect(await b.text()).toContain('#1 Trending on ');
   expect(await (await t.call('/badge/acme-run.svg?size=small')).text()).toContain('height="20"');
 });
 
@@ -117,8 +117,8 @@ test('badge ?scope=language ranks inside the language', async () => {
   const add = (slug, lang, stars, base) => { env.DB.raw.run('INSERT INTO products (slug, repo, name, tagline, homepage, license, language, topics, verified, created) VALUES (?,?,?,?,?,?,?,?,0,?)', [slug, `o/${slug}`, slug, '', '', '', lang, '', 1]); env.DB.raw.run('INSERT INTO snapshots VALUES (?,?,?,0)', [slug, new Date(Date.now() - 864e5).toISOString().slice(0, 10), base]); env.DB.raw.run('INSERT INTO snapshots VALUES (?,?,?,0)', [slug, day, stars]); };
   add('big-js', 'JavaScript', 900, 100); add('star-a', 'Starlark', 50, 40); add('star-b', 'Starlark', 20, 5);
   const get = async (slug) => (await handle(new Request(`https://r.si/badge/${slug}.svg?scope=language`), env, {})).text();
-  expect(await get('star-a')).toContain('#2 in Starlark');
-  expect(await get('star-b')).toContain('#1 in Starlark');
+  expect(await get('star-a')).toContain('#2 Trending');
+  expect(await get('star-b')).toContain('#1 Trending');
 });
 
 test('live mentions show the source logo, not initials', async () => {
