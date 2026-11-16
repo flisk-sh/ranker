@@ -4,6 +4,7 @@ import { trending, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
 import { authRoute, userOf } from './auth.js';
+import { refreshMentions } from './mentions.js';
 
 const mk = (s, status, who) => new Response(s.replace('<!--USER-->', page.userBox(who)), { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, max-age=0' } });
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
@@ -13,7 +14,8 @@ async function load(env, today) {
   const products = (await env.DB.prepare('SELECT * FROM products').all()).results || [];
   const from = new Date(Date.parse(today + 'T00:00:00Z') - 400 * 864e5).toISOString().slice(0, 10);
   const snaps = (await env.DB.prepare('SELECT slug, day, stars, forks FROM snapshots WHERE day >= ?').bind(from).all()).results || [];
-  return { products, snaps };
+  const mentions = (await env.DB.prepare('SELECT m.url, m.slug, m.source, m.text, m.author, m.at FROM mentions m WHERE m.at > ? ORDER BY m.at DESC LIMIT 300').bind(Date.now() - 30 * 864e5).all()).results || [];
+  return { products, snaps, mentions };
 }
 const ranked = (d, period, today) => trending(d.products, d.snaps, period, today);
 
@@ -83,7 +85,7 @@ export async function handle(req, env, deps = {}) {
     const d = await load(env, today);
     const p = d.products.find((x) => x.slug === m[1]);
     if (!p) return html(page.shell('Not found', '<h1>Not listed.</h1><p class="sub"><a href="/submit" style="text-decoration:underline">Submit it</a>.</p>'), 404);
-    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank]))));
+    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank])), d.mentions.filter((m) => m.slug === p.slug)));
   }
 
   if (path === '/compare') {
@@ -91,10 +93,10 @@ export async function handle(req, env, deps = {}) {
     const want = (u.searchParams.get('p') || '').split(',').filter(Boolean).slice(0, 4);
     return html(page.compare(want.map((s) => all.find((r) => r.slug === s)).filter(Boolean), d.snaps, all));
   }
-  if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(ranked(d, 'daily', today))); })();
+  if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(ranked(d, 'daily', today), d.mentions)); })();
   if (path === '/submit') return html(page.submit(who));
   if (path === '/badges') { const d = await load(env, today); return html(page.badges(ranked(d, 'daily', today), origin)); }
-  if (path === '/') { const d = await load(env, today); return html(page.home(ranked(d, period, today), period, d.snaps)); }
+  if (path === '/') { const d = await load(env, today); return html(page.home(ranked(d, period, today), period, d.snaps, d.mentions)); }
   return html(page.shell('Not found', '<h1>Not found.</h1>'), 404);
 }
 
@@ -117,7 +119,10 @@ export async function snapshot(env, deps = {}) {
 export async function tick(env, deps = {}) {
   const hour = new Date((deps.now || Date.now)()).toISOString().slice(0, 13);
   const r = await env.DB.prepare('INSERT OR IGNORE INTO days (day, n) VALUES (?, 1)').bind('run-' + hour).run();
-  return r.meta?.changes ? snapshot(env, deps) : 0;
+  if (!r.meta?.changes) return 0;
+  const n = await snapshot(env, deps);
+  await refreshMentions(env, deps).catch(() => 0);
+  return n;
 }
 
 export default {

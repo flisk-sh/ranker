@@ -19,3 +19,12 @@ CREATE TABLE IF NOT EXISTS snapshots (
 );
 CREATE INDEX IF NOT EXISTS snapshots_day ON snapshots (day);
 CREATE TABLE IF NOT EXISTS days (day TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS mentions (
+  url TEXT PRIMARY KEY,
+  slug TEXT NOT NULL,
+  source TEXT NOT NULL,
+  text TEXT NOT NULL DEFAULT '',
+  author TEXT NOT NULL DEFAULT '',
+  at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS mentions_slug ON mentions (slug, at);
