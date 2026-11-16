@@ -81,8 +81,11 @@ export async function handle(req, env, deps = {}) {
     if (!key || req.headers.get('authorization') !== `Bearer ${key}`) return json({ error: 'No.' }, 401);
     const body = await req.json().catch(() => ({}));
     const rows = (Array.isArray(body.rows) ? body.rows : []).filter((r) => r && typeof r.slug === 'string' && Number.isFinite(r.stars)).slice(0, 500);
+    // The first snapshot ever taken of a product is also its baseline for the day before, so gains show as soon as the next snapshot lands.
     const st = env.DB.prepare('INSERT OR REPLACE INTO snapshots (slug, day, stars, forks) VALUES (?,?,?,?)');
-    for (let i = 0; i < rows.length; i += 90) await env.DB.batch(rows.slice(i, i + 90).map((r) => st.bind(r.slug, today, r.stars | 0, r.forks | 0)));
+    const base = env.DB.prepare('INSERT INTO snapshots (slug, day, stars, forks) SELECT ?1, ?2, ?3, ?4 WHERE NOT EXISTS (SELECT 1 FROM snapshots WHERE slug = ?1 AND day < ?5)');
+    const yday = dayOf(deps.now() - 864e5);
+    for (let i = 0; i < rows.length; i += 45) await env.DB.batch(rows.slice(i, i + 45).flatMap((r) => [base.bind(r.slug, yday, r.stars | 0, r.forks | 0, today), st.bind(r.slug, today, r.stars | 0, r.forks | 0)]));
     return json({ saved: rows.length, day: today });
   }
   if (path === '/health') return json({ ok: true });
