@@ -116,6 +116,13 @@ export async function handle(req, env, deps = {}) {
     }
     return json({ saved: rows.length });
   }
+  if (path === '/api/search') {
+    const qs = (u.searchParams.get('q') || '').trim().toLowerCase().slice(0, 60).replace(/[%_\\]/g, '');
+    if (qs.length < 2) return json([]);
+    const like = `%${qs}%`;
+    const rs = (await env.DB.prepare('SELECT p.slug, p.name, p.repo, p.tagline, (SELECT stars FROM snapshots s WHERE s.slug = p.slug ORDER BY day DESC LIMIT 1) AS stars FROM products p WHERE lower(p.name) LIKE ?1 OR lower(p.repo) LIKE ?1 OR lower(p.tagline) LIKE ?1 OR lower(p.slug) LIKE ?1 ORDER BY stars DESC LIMIT 30').bind(like).all()).results || [];
+    return json(rs);
+  }
   const hm = /^\/api\/hourly\/([\w-]+)$/.exec(path);
   if (hm) {
     if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ error: 'Hourly history is not switched on yet.' }, 503);
