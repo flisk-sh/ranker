@@ -10,7 +10,19 @@ const mk = (s, status, who) => new Response(s.replace('<!--USER-->', page.userBo
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
 const svg = (s) => new Response(s, { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'public, max-age=300' } });
 
+// The catalog only changes hourly (snapshot job) or on a submit, so keep one copy per isolate for a minute.
+// Without this every page view re-read four whole tables and used 3M of the 5M free D1 rows a day.
+const memo = new WeakMap();
+const TTL = 60000;
+export const dropLoadCache = (env) => memo.delete(env.DB);
 async function load(env, today) {
+  const hit = memo.get(env.DB);
+  if (hit && hit.today === today && Date.now() - hit.t < TTL) return hit.v;
+  const v = await loadFresh(env, today);
+  memo.set(env.DB, { t: Date.now(), today, v });
+  return v;
+}
+async function loadFresh(env, today) {
   const products = (await env.DB.prepare('SELECT * FROM products').all()).results || [];
   const from = new Date(Date.parse(today + 'T00:00:00Z') - 400 * 864e5).toISOString().slice(0, 10);
   const snaps = (await env.DB.prepare('SELECT slug, day, stars, forks FROM snapshots WHERE day >= ?').bind(from).all()).results || [];
@@ -59,6 +71,7 @@ async function submitProduct(req, env, deps) {
     env.DB.prepare('INSERT OR REPLACE INTO snapshots (slug, day, stars, forks) VALUES (?,?,?,?)').bind(slug, today, r.stars, r.forks),
     env.DB.prepare('INSERT INTO days (day, n) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET n = n + 1').bind(today),
   ]);
+  dropLoadCache(env);
   return json(await summary(env, slug));
 }
 
@@ -144,6 +157,7 @@ export async function handle(req, env, deps = {}) {
     if (!p) return json({ error: 'Not listed.' }, 404);
     const ok = await hasBadge(p.repo, p.slug, { fetch: deps.fetch, origin });
     if (ok) await env.DB.prepare('UPDATE products SET verified = 1 WHERE slug = ?').bind(p.slug).run();
+    dropLoadCache(env);
     return json({ verified: ok });
   }
 
@@ -229,8 +243,10 @@ export async function tick(env, deps = {}) {
   const r = await env.DB.prepare('INSERT OR IGNORE INTO days (day, n) VALUES (?, 1)').bind('run-' + hour).run();
   if (!r.meta?.changes) return 0;
   const n = await snapshot(env, deps);
+  dropLoadCache(env);
   await refreshMentions(env, deps, 6).catch(() => 0);
   await refreshFacts(env, deps).catch(() => 0);
+  dropLoadCache(env);
   return n;
 }
 

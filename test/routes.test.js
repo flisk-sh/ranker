@@ -214,3 +214,16 @@ test('/api/mentions answers with no mentions', async () => {
   expect(r.status).toBe(200);
   expect((await r.json()).items).toEqual([]);
 });
+
+test('page views share one catalog read for a minute, and a submit refreshes it', async () => {
+  const t = setup({ 'acme/run': { stars: 10 }, 'acme/two': { stars: 5 } });
+  await t.post('/api/submit', { url: 'https://github.com/acme/run' });
+  let reads = 0;
+  const prepare = t.env.DB.prepare.bind(t.env.DB);
+  t.env.DB.prepare = (sql) => { if (/FROM products$/.test(sql)) reads++; return prepare(sql); };
+  await t.call('/'); await t.call('/'); await t.call('/live');
+  expect(reads).toBe(1);
+  await t.post('/api/submit', { url: 'https://github.com/acme/two' });
+  await t.call('/');
+  expect(reads).toBe(2);
+});
