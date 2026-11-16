@@ -13,12 +13,8 @@ SUBMITS_PER_DAY = "100"
 [[d1_databases]]
 binding = "DB"
 database_name = "flisk-ranker"
-database_id = "REPLACE_AFTER_d1_create"
+database_id = "f034d409-6e64-4c0e-98cd-ad0abffc722a"
 
-[triggers]
-crons = ["7 * * * *"]
-
-# Add once the database exists and the domain is agreed:
-# [[routes]]
-# pattern = "ranker.flisk.si"
-# custom_domain = true
+[[routes]]
+pattern = "ranker.flisk.si"
+custom_domain = true

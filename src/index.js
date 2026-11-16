@@ -102,7 +102,14 @@ export async function snapshot(env, deps = {}) {
   return done;
 }
 
+// The free plan has no spare cron triggers, so the first visit each hour runs the snapshot job.
+export async function tick(env, deps = {}) {
+  const hour = new Date((deps.now || Date.now)()).toISOString().slice(0, 13);
+  const r = await env.DB.prepare('INSERT OR IGNORE INTO days (day, n) VALUES (?, 1)').bind('run-' + hour).run();
+  return r.meta?.changes ? snapshot(env, deps) : 0;
+}
+
 export default {
-  fetch: (req, env) => handle(req, env),
+  fetch: (req, env, ctx) => { ctx?.waitUntil?.(tick(env).catch(() => 0)); return handle(req, env); },
   scheduled: (_e, env, ctx) => ctx.waitUntil(snapshot(env)),
 };

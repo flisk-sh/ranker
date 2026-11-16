@@ -89,3 +89,12 @@ test('pages and plumbing answer', async () => {
   expect((await t.call('/p/ghost')).status).toBe(404);
   expect((await t.call('/nope')).status).toBe(404);
 });
+
+test('tick runs the snapshot once an hour', async () => {
+  const { tick } = await import('../src/index.js');
+  const t = setup({ 'a/x': { stars: 5 } });
+  await t.post('/api/submit', { url: 'https://github.com/a/x' });
+  const next = { ...t.deps, now: () => NOW + 864e5 };
+  expect(await tick(t.env, next)).toBe(1);
+  expect(await tick(t.env, next)).toBe(0);
+});
