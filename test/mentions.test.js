@@ -33,3 +33,20 @@ test('decodes HTML entities in Hacker News text', async () => {
   const [m] = await searchHN('flisk', 0, f);
   expect(m.text).toBe("Show HN: x run npx @flisk-sh/flisk 'demo'");
 });
+
+import { pulse } from '../src/mentions.js';
+test('pulse looks again after 10 minutes, but at most once every 20 seconds', async () => {
+  const env = { DB: fakeD1() };
+  await env.DB.prepare("INSERT INTO products (slug, repo, name, created) VALUES ('acme-run','acme/run','run',1)").run();
+  const NOW = Date.UTC(2026, 10, 16, 12);
+  let calls = 0;
+  const fetch = async () => { calls++; return new Response(JSON.stringify({ hits: [], posts: [] })); };
+  await pulse(env, { fetch, now: () => NOW });
+  const n = calls;
+  expect(n).toBeGreaterThan(0);
+  expect(await pulse(env, { fetch, now: () => NOW + 5000 })).toBe(-1);
+  await pulse(env, { fetch, now: () => NOW + 30000 });
+  expect(calls).toBe(n);
+  await pulse(env, { fetch, now: () => NOW + 11 * 6e4 });
+  expect(calls).toBe(n * 2);
+});

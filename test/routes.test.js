@@ -188,3 +188,10 @@ test('awesome lists are left out of the home list unless asked', async () => {
   expect(def).toContain('/p/acme-run');
   expect(all).toContain('/p/sindresorhus-awesome');
 });
+
+test('/api/mentions answers with no mentions', async () => {
+  const t = setup({});
+  const r = await t.call('/api/mentions?limit=5');
+  expect(r.status).toBe(200);
+  expect((await r.json()).items).toEqual([]);
+});

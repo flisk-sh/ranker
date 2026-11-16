@@ -18,7 +18,7 @@ test('body grows with stars, rank climbs with position', () => {
 test('large badge is 250x55 and says Flisk Ranker', () => {
   const s = badgeSvg({ rank: 3, stars: 5000, period: 'weekly' });
   expect(s).toContain('width="250" height="55"');
-  expect(s).toContain('FLISK RANKER');
+  expect(s).toContain('STARS GAINED · ALL LANGUAGES');
   expect(s).toContain('#3 Trending this week');
   expect(badgeSvg({ rank: 2, stars: 5, period: 'daily', day: '2026-11-16' })).toContain('on 16 Nov');
   expect(badgeSvg({ rank: 2, stars: 5, period: 'monthly', day: '2026-11-16' })).toContain('in Nov 2026');
@@ -49,6 +49,7 @@ test('long text scrolls inside the box, short text stays still', () => {
 });
 
 test('a language badge says the rank inside the language', () => {
-  expect(badgeSvg({ rank: 1, stars: 10, lang: 'Starlark' })).toContain('#1 Trending today · Starlark');
+  expect(badgeSvg({ rank: 1, stars: 10, lang: 'Starlark' })).toContain('STARS GAINED · STARLARK');
+  expect(badgeSvg({ rank: 1, stars: 10, lang: 'Starlark', size: 'small' })).toContain('#1 Trending today · Starlark');
   expect(embed('https://r.si', 'a-b', { scope: 'language' }).url).toBe('https://r.si/badge/a-b.svg?scope=language');
 });

@@ -57,26 +57,29 @@ const twinkle = (x, y, r, d, i) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#
 export function badgeSvg({ rank = 0, stars = 0, period = 'daily', size = 'large', label, lang, day } = {}) {
   const r = bodyOf(stars), c = rankOf(rank), m = METAL[Math.floor(c / 5)];
   const when = whenOf(period, day);
-  const main = label || (rank > 0 ? `#${rank} Trending ${when}${lang ? ' \u00b7 ' + lang : ''}` : 'Listed on Ranker');
-  const title = `Flisk Ranker: ${main}. ${RANKS[c]}, ${BODIES[r]}.`;
+  const scope = lang || 'all languages';
+  const long = rank > 0 ? `#${rank} Trending ${when}` : '';
+  const main = label || (rank > 0 ? (long.length * 8.2 > 180 ? `#${rank} ${when}` : long) : 'Listed on Ranker');
+  const smallMain = label || (rank > 0 ? `${long} \u00b7 ${scope}` : 'Listed on Ranker');
+  const title = `Flisk Ranker: ${rank > 0 ? `#${rank} by stars gained ${when}, ${scope}` : main}. ${RANKS[c]}, ${BODIES[r]}.`;
   if (size === 'small') {
-    const w = Math.ceil((main.length + 7) * 6.3) + 56;
+    const w = Math.ceil((smallMain.length + 7) * 6.3) + 56;
     const n = (c % 5) + 1;
     let ch = '';
     for (let i = 0; i < n; i++) ch += `<path d="M${w - 14} ${14 - i * 3}l3.5 -2l3.5 2" fill="none" stroke="${m}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>`;
     const k = 6;
     const star = `<g transform="translate(11 10)"><g><animateTransform attributeName="transform" type="rotate" values="0;90" dur="8s" repeatCount="indefinite"/><path d="M0 -${k}L${f2(k * 0.22)} -${f2(k * 0.22)}L${k} 0L${f2(k * 0.22)} ${f2(k * 0.22)}L0 ${k}L-${f2(k * 0.22)} ${f2(k * 0.22)}L-${k} 0L-${f2(k * 0.22)} -${f2(k * 0.22)}Z" fill="${m}"><animate attributeName="opacity" values="1;.4;1" dur="2.4s" repeatCount="indefinite"/></path></g></g>`;
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="20" viewBox="0 0 ${w} 20" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><rect x=".5" y=".5" width="${w - 1}" height="19" rx="4" fill="#03040B" stroke="#2f3646"/>${twinkle(34, 5, 0.6, 2, 0)}${twinkle(w - 26, 16, 0.6, 2.5, 1)}${twinkle(60, 15, 0.6, 3, 2)}${star}<text x="23" y="14" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11" fill="#fff"><tspan fill="${m}">ranker</tspan> ${esc(main)}</text>${ch}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="20" viewBox="0 0 ${w} 20" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><rect x=".5" y=".5" width="${w - 1}" height="19" rx="4" fill="#03040B" stroke="#2f3646"/>${twinkle(34, 5, 0.6, 2, 0)}${twinkle(w - 26, 16, 0.6, 2.5, 1)}${twinkle(60, 15, 0.6, 3, 2)}${star}<text x="23" y="14" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11" fill="#fff"><tspan fill="${m}">ranker</tspan> ${esc(smallMain)}</text>${ch}</svg>`;
   }
   const stars6 = STARS.map(([x, y, rr, d], i) => twinkle(x, y, rr, d, i)).join('');
-  const lab = `>_ FLISK RANKER · ${RANKS[c].toUpperCase()}`;
+  const lab = `STARS GAINED \u00b7 ${scope.toUpperCase()}`;
   const line = (id, text, est, y, attrs) => {
     const avail = 182, over = est - avail;
     if (over <= 0) return `<text x="62" y="${y}" ${attrs}>${esc(text)}</text>`;
     const d = f2(over + 8), dur = f2(4 + d / 18);
     return `<clipPath id="${id}"><rect x="62" y="${y - 16}" width="${avail}" height="22"/></clipPath><g clip-path="url(#${id})"><text x="62" y="${y}" ${attrs}>${esc(text)}<animateTransform attributeName="transform" type="translate" values="0 0;0 0;-${d} 0;-${d} 0;0 0" keyTimes="0;.15;.6;.8;1" dur="${dur}s" repeatCount="indefinite"/></text></g>`;
   };
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="55" viewBox="0 0 250 55" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><rect x=".5" y=".5" width="249" height="54" rx="10" fill="#03040B" stroke="#2f3646"/>${stars6}<g transform="translate(2 1.5) scale(2)">${figure(r, c)}</g>${line('a', lab, lab.length * 6.4, 21, `font-family="ui-monospace,Menlo,monospace" font-size="9" letter-spacing="1" fill="${m}"`)}${line('b', main, main.length * 8.2, 40, 'font-family="Inter,system-ui,sans-serif" font-size="16" font-weight="500" fill="#fff"')}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="55" viewBox="0 0 250 55" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><rect x=".5" y=".5" width="249" height="54" rx="10" fill="#03040B" stroke="#2f3646"/>${stars6}<g transform="translate(2 1.5) scale(2)">${figure(r, c)}</g>${line('a', lab, lab.length * 6.4, 21, `font-family="ui-monospace,Menlo,monospace" font-size="9" letter-spacing=".6" fill="${m}"`)}${line('b', main, main.length * 8.2, 40, 'font-family="Inter,system-ui,sans-serif" font-size="16" font-weight="500" fill="#fff"')}</svg>`;
 }
 
 // The snippets a maker pastes into a README.
