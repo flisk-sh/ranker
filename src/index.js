@@ -4,7 +4,7 @@ import { trending, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
 import { authRoute, userOf } from './auth.js';
-import { refreshMentions } from './mentions.js';
+import { refreshMentions, phrasesOf } from './mentions.js';
 
 const mk = (s, status, who) => new Response(s.replace('<!--USER-->', page.userBox(who)), { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, max-age=0' } });
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
@@ -20,13 +20,20 @@ async function load(env, today) {
 }
 const ranked = (d, period, today) => trending(d.products, d.snaps, period, today);
 
+async function summary(env, slug, rank) {
+  const p = await env.DB.prepare('SELECT * FROM products WHERE slug = ?').bind(slug).first();
+  const sn = await env.DB.prepare('SELECT stars FROM snapshots WHERE slug = ? ORDER BY day DESC LIMIT 1').bind(slug).first();
+  const terms = [...new Set([p.name, ...phrasesOf(p)].map((x) => String(x || '').toLowerCase()).filter(Boolean))];
+  return { slug, url: `/p/${slug}`, product: { name: p.name, tagline: p.tagline, license: p.license, language: p.language, topics: p.topics, repo: p.repo, homepage: p.homepage, stars: sn?.stars || 0, verified: !!p.verified }, terms };
+}
+
 async function submitProduct(req, env, deps) {
   const body = await req.json().catch(() => ({}));
   const repo = await resolveLink(body.url, { fetch: deps.fetch });
   if (!repo) return json({ error: 'No GitHub repo found at that link. Paste a GitHub, npm, PyPI or website link that points to one.' }, 400);
   const slug = slugOf(repo);
   const old = await env.DB.prepare('SELECT slug FROM products WHERE slug = ?').bind(slug).first();
-  if (old) return json({ slug, url: `/p/${slug}` });
+  if (old) return json(await summary(env, slug));
   const today = dayOf(deps.now());
   const cap = Number(env.SUBMITS_PER_DAY || 100);
   const used = (await env.DB.prepare('SELECT n FROM days WHERE day = ?').bind(today).first())?.n || 0;
@@ -38,7 +45,7 @@ async function submitProduct(req, env, deps) {
     env.DB.prepare('INSERT OR REPLACE INTO snapshots (slug, day, stars, forks) VALUES (?,?,?,?)').bind(slug, today, r.stars, r.forks),
     env.DB.prepare('INSERT INTO days (day, n) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET n = n + 1').bind(today),
   ]);
-  return json({ slug, url: `/p/${slug}` });
+  return json(await summary(env, slug));
 }
 
 export async function handle(req, env, deps = {}) {
