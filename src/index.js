@@ -81,6 +81,12 @@ export async function handle(req, env, deps = {}) {
     return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin));
   }
 
+  if (path === '/compare') {
+    const d = await load(env, today), all = ranked(d, 'daily', today);
+    const want = (u.searchParams.get('p') || '').split(',').filter(Boolean).slice(0, 4);
+    return html(page.compare(want.map((s) => all.find((r) => r.slug === s)).filter(Boolean), d.snaps, all));
+  }
+  if (path === '/live') return html(page.live());
   if (path === '/submit') return html(page.submit());
   if (path === '/badges') { const d = await load(env, today); return html(page.badges(ranked(d, 'daily', today), origin)); }
   if (path === '/') { const d = await load(env, today); return html(page.home(ranked(d, period, today), period)); }

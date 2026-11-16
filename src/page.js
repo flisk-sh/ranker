@@ -25,7 +25,7 @@ const SKY = `const c=document.getElementById('sky'),x=c.getContext('2d');let S=[
 (function f(t){x.clearRect(0,0,W,H);for(const s of S){x.fillStyle='rgba(255,255,255,'+(.15+.85*(.5+.5*Math.sin(t/1000*s.v+s.p)))+')';x.beginPath();x.arc(s.x,s.y,s.r,0,6.3);x.fill()}requestAnimationFrame(f)})(0)`;
 
 export function shell(title, body, { desc = 'Flisk Ranker ranks products by what happened on GitHub and gives each one a live README badge.', script = '' } = {}) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><link rel="icon" href="/icon.svg"><style>${CSS}</style></head><body><canvas id="sky"></canvas><div class="w"><nav><a class="l" href="/">&gt;_ flisk.ranker</a><a href="/">Trending</a><a href="/badges">Badges</a><a href="/submit">Submit</a><span class="s"></span><a class="cta" href="/submit">Submit your product</a></nav>${body}</div><script>${SKY}</script>${script ? `<script>${script}</script>` : ''}</body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><link rel="icon" href="/icon.svg"><style>${CSS}</style></head><body><canvas id="sky"></canvas><div class="w"><nav><a class="l" href="/">&gt;_ flisk.ranker</a><a href="/">Trending</a><a href="/compare">Compare</a><a href="/live">Live mentions</a><a href="/badges">Badges</a><a href="/submit">Submit</a><span class="s"></span><a class="cta" href="/submit">Submit your product</a></nav>${body}</div><script>${SKY}</script>${script ? `<script>${script}</script>` : ''}</body></html>`;
 }
 
 const PER = [['daily', 'Today'], ['weekly', 'This week'], ['monthly', 'This month'], ['yearly', 'This year']];
@@ -65,3 +65,30 @@ export function badges(rows, origin) {
 }
 
 export const sampleBadge = (size) => badgeSvg({ rank: 1, stars: 40000, size });
+
+// Compare up to four products side by side, only numbers we really have.
+export function compare(rows, snaps, all) {
+  const cols = rows.slice(0, 4);
+  const opts = all.filter((r) => !cols.find((c) => c.slug === r.slug)).slice(0, 100).map((r) => `<option value="${esc(r.slug)}">${esc(r.name)}</option>`).join('');
+  const spark = (slug) => {
+    const s = snaps.filter((x) => x.slug === slug).sort((a, b) => (a.day < b.day ? -1 : 1)).slice(-90);
+    if (s.length < 2) return '<small>Not enough days yet</small>';
+    const lo = Math.min(...s.map((x) => x.stars)), hi = Math.max(...s.map((x) => x.stars)), span = hi - lo || 1;
+    const pts = s.map((x, i) => `${Math.round((i / (s.length - 1)) * 160)},${Math.round(42 - ((x.stars - lo) / span) * 40)}`).join(' ');
+    return `<svg viewBox="0 0 160 44" style="width:100%;height:44px" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="#7ee2a8" stroke-width="2"/></svg>`;
+  };
+  const best = (f) => { const v = cols.map(f); const m = Math.max(...v); return v.map((x) => (x === m && v.filter((y) => y === m).length === 1 ? 'g' : '')); };
+  const stars = best((c) => c.stars), gain = best((c) => c.gain);
+  const line = (l, cells) => `<tr><th class="lbl" style="text-align:left;padding:14px 12px;font-weight:400">${l}</th>${cells.map((c) => `<td style="padding:14px 12px;border-left:1px solid rgba(255,255,255,.1)">${c}</td>`).join('')}</tr>`;
+  const table = cols.length
+    ? `<div class="box" style="overflow-x:auto;margin-top:24px"><table style="border-collapse:collapse;width:100%;min-width:560px"><tr><th></th>${cols.map((c) => `<th style="padding:14px 12px;text-align:left;border-left:1px solid rgba(255,255,255,.1)"><a href="/p/${esc(c.slug)}" style="font-size:18px;font-weight:500">${esc(c.name)}</a>${c.verified ? '<br><small>verified</small>' : ''} <a href="/compare?p=${esc(cols.filter((x) => x.slug !== c.slug).map((x) => x.slug).join(','))}" aria-label="Remove ${esc(c.name)}" style="color:#8A8F98">&times;</a></th>`).join('')}</tr>
+${line('Trending rank today', cols.map((c) => '#' + c.rank))}${line('Stars', cols.map((c, i) => `<span class="${stars[i]}">${short(c.stars)}</span>`))}${line('Stars gained today', cols.map((c, i) => `<span class="${gain[i]}">${c.gain >= 0 ? '+' : ''}${short(c.gain)}</span>`))}${line('Licence', cols.map((c) => esc(c.license || 'None listed')))}${line('Language', cols.map((c) => esc(c.language || '-')))}${line('Stars, 90 days', cols.map((c) => spark(c.slug)))}</table></div>`
+    : '<p class="sub" style="margin-top:24px">Pick two to four products below.</p>';
+  const add = cols.length < 4 && opts ? `<form method="get" action="/compare" class="box" style="margin-top:18px"><input type="hidden" name="p" value="${esc(cols.map((c) => c.slug).join(','))}"><div class="lbl">Add a product</div><select id="add" style="margin:10px 0;width:100%;background:#000;color:#fff;border:1px solid #2A2F38;border-radius:10px;padding:12px;font:16px Inter,sans-serif">${opts}</select><button type="submit" onclick="var f=this.form,h=f.p;h.value=(h.value?h.value+',':'')+f.querySelector('select').value">Add</button></form>` : '';
+  return shell('Compare products', `<div class="lbl" style="margin-top:36px">Compare</div><h1 style="margin-top:8px">${cols.length ? cols.map((c) => esc(c.name)).join(' vs ') : 'Compare products'}</h1><p class="sub">The same live GitHub numbers for every product. Add up to four.</p>${table}${add}`);
+}
+
+// Live mentions need Flisk Grow; until it is connected the page says so and shows no made-up posts.
+export function live() {
+  return shell('Live mentions', `<div class="lbl" style="margin-top:36px">Live mentions</div><h1 style="margin-top:8px">Who is talking about what, right now.</h1><p class="sub">Mentions of listed products on X, Hacker News, Reddit, Bluesky and YouTube, found by Flisk Grow and matched to the right product.</p><div class="box" style="margin-top:26px"><div class="lbl">Coming soon</div><p style="margin:10px 0 0;color:#B8BDC6">The feed is not connected yet. When it is, every product page shows its mentions too. Submit your product now and it is matched from day one.</p><p style="margin-top:16px"><a class="btn" href="/submit">Submit your product</a></p></div>`);
+}

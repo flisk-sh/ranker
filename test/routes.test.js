@@ -85,7 +85,7 @@ test('snapshot job adds today, tomorrow gain ranks the climber first', async () 
 
 test('pages and plumbing answer', async () => {
   const t = setup({});
-  for (const p of ['/', '/?period=weekly', '/submit', '/badges', '/health', '/robots.txt', '/llms.txt', '/icon.svg']) expect((await t.call(p)).status).toBe(200);
+  for (const p of ['/', '/?period=weekly', '/submit', '/badges', '/compare', '/live', '/health', '/robots.txt', '/llms.txt', '/icon.svg']) expect((await t.call(p)).status).toBe(200);
   expect((await t.call('/p/ghost')).status).toBe(404);
   expect((await t.call('/nope')).status).toBe(404);
 });
@@ -97,4 +97,14 @@ test('tick runs the snapshot once an hour', async () => {
   const next = { ...t.deps, now: () => NOW + 864e5 };
   expect(await tick(t.env, next)).toBe(1);
   expect(await tick(t.env, next)).toBe(0);
+});
+
+test('compare shows the chosen products side by side', async () => {
+  const t = setup({ 'a/one': { stars: 10 }, 'a/two': { stars: 20 } });
+  await t.post('/api/submit', { url: 'https://github.com/a/one' });
+  await t.post('/api/submit', { url: 'https://github.com/a/two' });
+  const h = await (await t.call('/compare?p=a-one,a-two,ghost')).text();
+  expect(h).toContain('a-one'.replace('a-one', 'one'));
+  expect(h).toContain(' vs ');
+  expect(await (await t.call('/compare')).text()).toContain('Pick two to four');
 });
