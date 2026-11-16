@@ -29,3 +29,4 @@ CREATE TABLE IF NOT EXISTS mentions (
 );
 CREATE INDEX IF NOT EXISTS mentions_slug ON mentions (slug, at);
 CREATE TABLE IF NOT EXISTS facts (slug TEXT PRIMARY KEY, json TEXT NOT NULL, at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS mentions_at ON mentions (at);
