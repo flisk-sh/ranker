@@ -210,7 +210,16 @@ export async function handle(req, env, deps = {}) {
   if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(ranked(d, 'daily', today), d.mentions)); })();
   if (path === '/submit') return html(page.submit(who));
   if (path === '/badges') { const d = await load(env, today); return html(page.badges(ranked(d, 'daily', today), origin)); }
-  if (path === '/') { const d = await load(env, today); return html(page.home(u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today)), period, d.snaps, d.mentions, u.searchParams.get('awesome') === '1')); }
+  if (path === '/') {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      return new Response('Method Not Allowed', { status: 405, headers: { allow: 'GET, HEAD' } });
+    }
+    const d = await load(env, today);
+    const includeAwesome = u.searchParams.get('awesome') === '1';
+    const rows = ranked(d, period, today);
+    const response = html(page.home(includeAwesome ? rows : withoutAwesome(rows), period, d.snaps, d.mentions, includeAwesome));
+    return req.method === 'HEAD' ? new Response(null, response) : response;
+  }
   return html(page.shell('Not found', '<h1>Not found.</h1>'), 404);
 }
 
