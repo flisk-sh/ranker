@@ -11,6 +11,21 @@ const mk = (s, status, who) => new Response(s.replace('<!--USER-->', page.userBo
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
 const svg = (s) => new Response(s, { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'public, max-age=300' } });
 
+async function cachedResponse(request, body, contentType, cacheControl) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body));
+  const etag = '"' + Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('') + '"';
+  const headers = { 'content-type': contentType, 'cache-control': cacheControl, etag };
+  const candidates = request.headers.get('if-none-match')?.split(',') ?? [];
+  const matches = candidates.some((candidate) => {
+    const tag = candidate.trim();
+    return tag === '*' || tag.replace(/^W\//, '') === etag;
+  });
+  if (matches && (request.method === 'GET' || request.method === 'HEAD')) {
+    return new Response(null, { status: 304, headers });
+  }
+  return new Response(request.method === 'HEAD' ? null : body, { headers });
+}
+
 // The catalog only changes hourly (snapshot job) or on a submit, so keep one copy per isolate for a minute.
 // Without this every page view re-read four whole tables and used 3M of the 5M free D1 rows a day.
 const memo = new WeakMap();
@@ -170,7 +185,9 @@ export async function handle(req, env, deps = {}) {
   if (path === '/api/trending') {
     if (asked !== null && !known) return json({ error: 'period must be daily, weekly, monthly or yearly' }, 400);
     const d = await load(env, today);
-    return json((u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today))).slice(0, 100).map(({ slug, name, repo, stars, gain, rank, verified }) => ({ rank, slug, name, repo, stars, gain, verified: !!verified, period })));
+    const rows = (u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today))).slice(0, 100);
+    const body = JSON.stringify(rows.map(({ slug, name, repo, stars, gain, rank, verified }) => ({ rank, slug, name, repo, stars, gain, verified: !!verified, period })));
+    return cachedResponse(req, body, 'application/json; charset=utf-8', 'public, max-age=300, stale-while-revalidate=600');
   }
 
   m = /^\/badge\/([a-z0-9-]+)\.svg$/.exec(path);
