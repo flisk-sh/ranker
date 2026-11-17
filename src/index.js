@@ -153,6 +153,7 @@ export async function handle(req, env, deps = {}) {
   if (path === '/health') return json({ ok: true });
   if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n', { headers: { 'content-type': 'text/plain' } });
   if (path === '/icon.svg') return svg(page.ICON);
+  if (path === '/favicon.ico') return new Response(null, { status: 308, headers: { location: '/icon.svg', 'cache-control': 'public, max-age=86400' } });
   if (path === '/llms.txt') return new Response('# Flisk Ranker\nProducts ranked by stars gained on GitHub, with live README badges.\n- /badge/<slug>.svg?period=daily|weekly|monthly|yearly&size=large|small\n- /api/trending?period=daily\n', { headers: { 'content-type': 'text/plain' } });
 
   if (req.method === 'POST' && path === '/api/submit') return submitProduct(req, env, deps);
