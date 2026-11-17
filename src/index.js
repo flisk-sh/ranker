@@ -151,7 +151,7 @@ export async function handle(req, env, deps = {}) {
     return json(r?.ok ? ((await r.json()).data || []) : { error: 'Hourly history did not answer.' }, r?.ok ? 200 : 502);
   }
   if (path === '/health') return json({ ok: true });
-  if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n', { headers: { 'content-type': 'text/plain' } });
+  if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n', { headers: { 'content-type': 'text/plain', 'cache-control': 'public, max-age=86400' } });
   if (path === '/icon.svg') return svg(page.ICON);
   if (path === '/llms.txt') return new Response('# Flisk Ranker\nProducts ranked by stars gained on GitHub, with live README badges.\n- /badge/<slug>.svg?period=daily|weekly|monthly|yearly&size=large|small\n- /api/trending?period=daily\n', { headers: { 'content-type': 'text/plain' } });
 
