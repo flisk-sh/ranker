@@ -211,6 +211,7 @@ export async function handle(req, env, deps = {}) {
   if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(ranked(d, 'daily', today), d.mentions)); })();
   if (path === '/submit') return html(page.submit(who));
   if (path === '/badges') { const d = await load(env, today); return html(page.badges(ranked(d, 'daily', today), origin)); }
+  if (path === '/' && req.method !== 'GET' && req.method !== 'HEAD') return new Response(null, { status: 405, headers: { allow: 'GET, HEAD', 'cache-control': 'no-store' } });
   if (path === '/') { const d = await load(env, today); return html(page.home(u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today)), period, d.snaps, d.mentions, u.searchParams.get('awesome') === '1')); }
   return html(page.shell('Not found', '<h1>Not found.</h1>'), 404);
 }
