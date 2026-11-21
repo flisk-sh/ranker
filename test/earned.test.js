@@ -1,0 +1,33 @@
+import { expect, test } from 'bun:test';
+import { earned } from '../src/score.js';
+import { earnedBadges, achv } from '../src/page.js';
+
+const prods = [{ slug: 'a', language: 'Go' }, { slug: 'b', language: 'Go' }, { slug: 'c', language: 'Rust' }];
+const snaps = [];
+for (const [d, a, b, c] of [['2026-10-01', 10, 10, 10], ['2026-10-02', 30, 20, 50], ['2026-10-03', 60, 25, 55]])
+  snaps.push({ slug: 'a', day: d, stars: a }, { slug: 'b', day: d, stars: b }, { slug: 'c', day: d, stars: c });
+
+test('earned finds the first day a product reached its best rank, overall and in its language', () => {
+  const w = earned(prods[0], prods, snaps, '2026-10-03');
+  const day = w.find((x) => x.period === 'daily' && x.scope === 'language');
+  expect(day).toMatchObject({ rank: 1, day: '2026-10-02' });
+  expect(w.find((x) => x.period === 'daily' && x.scope === 'all')).toMatchObject({ rank: 1, day: '2026-10-03' });
+});
+
+test('earned skips products that gained nothing or rank below the top', () => {
+  expect(earned(prods[1], prods, snaps, '2026-10-03', { top: 1 })).toEqual([]);
+});
+
+test('earnedBadges draws our own Ranker badge with the date, never a Trendshift image', () => {
+  const h = earnedBadges([{ rank: 1, period: 'daily', scope: 'language', day: '2026-10-02', stars: 30 }], { language: 'Go' });
+  expect(h).toContain('data:image/svg+xml');
+  expect(h).toContain('#1 Go Repository Of The Day');
+  expect(h).toContain('first achieved 2 Oct 2026');
+  expect(h).not.toContain('trendshift');
+  expect(earnedBadges([], {})).toBe('');
+});
+
+test('ranker star milestones carry the day each was first reached', () => {
+  const s = [{ slug: 's', day: '2026-10-01', stars: 90 }, { slug: 's', day: '2026-10-05', stars: 101 }];
+  expect(achv({ slug: 's' }, { stars: 101, rank: 50 }, s)).toEqual(['100 stars · first achieved 2026-10-05']);
+});
