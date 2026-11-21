@@ -164,6 +164,17 @@ const dateLabel = (day) => { const d = new Date(`${day}T00:00:00Z`); return `${d
 const NAMES = { daily: 'Day', weekly: 'Week', monthly: 'Month' };
 
 // Our own badges: the best rank the product reached, drawn by the Ranker badge, with the day it was first reached.
+// Badges for rankings read from a third-party list (language rank, which GitHub's primary language cannot give us).
+// Only the facts are used (rank, language, period, first-achieved date); the badge is drawn by Ranker.
+export function listedBadges(t, stars = 0) {
+  if (!t?.items?.length) return '';
+  return t.items.map((a) => {
+    const rank = Number(/^#(\d+)/.exec(a.alt)?.[1]) || 1, name = esc(a.alt);
+    const svg = badgeSvg({ rank, stars, period: a.period, label: a.alt, kicker: `TRENDING \u00b7 ${String(a.lang || 'ALL').toUpperCase()}` });
+    return `<p style="margin:14px 0 0"><img src="data:image/svg+xml,${encodeURIComponent(svg)}" width="250" height="55" alt="${name}" loading="lazy"><br><small>${name} &middot; first achieved ${esc(String(a.when).replace(/^(on|in) /, ''))}</small></p>`;
+  }).join('');
+}
+
 export function earnedBadges(won = [], p = {}) {
   return won.map((w) => {
     const svg = badgeSvg({ rank: w.rank, stars: w.stars, period: w.period, day: w.day, lang: w.scope === 'language' ? p.language : undefined });
@@ -196,7 +207,7 @@ ${snaps.filter((x) => x.slug === p.slug).length > 1 ? `<div class="card" style="
 <div class="b"><div class="card"><div class="lbl">YOUR BADGE, LIVE</div><p style="margin:14px 0 8px"><img src="/badge/${esc(p.slug)}.svg" width="250" height="55" alt="Flisk Ranker badge"></p><p style="font-size:13px;color:#9AA0AA;margin:12px 0">${rank ? `#${rank} today, ${RANKS[rankOf(rank)]}. ${BODIES[bodyOf(stars)]} with ${short(stars)} stars.` : 'Not ranked yet.'}</p>${p.verified ? '<span class="ok">Verified: the badge is in the README.</span>' : '<small>Not verified yet. Put the badge in your README, then press the button.</small><br><br><button id="v">Check my README</button> <small id="vm"></small>'}</div>${embedBox(origin, p.slug, p.language, p.repo)}
 <div class="card"><div class="lbl">OSS SCORE &middot; GEL GUARDS</div><div id="oss" style="margin:12px 0 0;font-size:13px;line-height:1.7;color:#9AA0AA">Scanning this repo...</div></div>
 <div class="card"><div class="lbl">WHAT WE SCANNED</div><p style="font-size:13px;line-height:1.6;color:#9AA0AA;margin:12px 0">Stars and forks, every day. Open the CI scan to see its red workflows, flaky runs and GEL guard results, read live from GitHub.</p><a class="btn" href="${cilytics(p.repo)}" rel="nofollow">Open in Cilytics</a></div>
-<div class="card"><div class="lbl">ACHIEVEMENTS</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">${achv(p, row, snaps).map((a) => `<span class="pill ok">${esc(a)}</span>`).join('') || (won.length ? '' : '<small>None yet. They come with stars and rank.</small>')}</div>${earnedBadges(won, p)}</div>${alts.length ? `<div class="card"><div class="lbl">ALTERNATIVES</div>${alts.map((r) => `<div style="display:flex;gap:10px;align-items:center;padding-top:12px">${mark(r, 30)}<a href="${esc(pageOf(r))}">${esc(r.name)}</a><span style="flex:1"></span><span class="lbl">${short(r.stars)} &#9733;</span></div>`).join('')}</div>` : ''}</div></div>`;
+<div class="card"><div class="lbl">ACHIEVEMENTS</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">${achv(p, row, snaps).map((a) => `<span class="pill ok">${esc(a)}</span>`).join('') || (won.length || fx?.trendshift?.items?.length ? '' : '<small>None yet. They come with stars and rank.</small>')}</div>${listedBadges(fx?.trendshift, stars)}${earnedBadges(won, p)}</div>${alts.length ? `<div class="card"><div class="lbl">ALTERNATIVES</div>${alts.map((r) => `<div style="display:flex;gap:10px;align-items:center;padding-top:12px">${mark(r, 30)}<a href="${esc(pageOf(r))}">${esc(r.name)}</a><span style="flex:1"></span><span class="lbl">${short(r.stars)} &#9733;</span></div>`).join('')}</div>` : ''}</div></div>`;
   const script = ossScript(p.repo) + ';' + (p.verified ? '' : `document.getElementById('v').onclick=async()=>{const m=document.getElementById('vm');m.textContent='Checking...';const r=await fetch('/api/verify/${esc(p.slug)}',{method:'POST'}).then(r=>r.json()).catch(()=>({}));m.textContent=r.verified?'Verified.':'Badge not found in the README yet.';if(r.verified)location.reload()}`);
   return shell(`${p.name} on Ranker`, body, { desc: p.tagline || undefined, script });
 }

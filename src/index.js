@@ -4,6 +4,7 @@ import { trending, earned, withoutAwesome, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
 import { authRoute, userOf } from './auth.js';
+import { fetchTrendshift } from './trendshift.js';
 import { refreshMentions, pulse, phrasesOf } from './mentions.js';
 import { withSecurityHeaders } from './security-headers.js';
 
@@ -239,11 +240,12 @@ export async function snapshot(env, deps = {}) {
 // Activity facts for the two products checked longest ago (4 outside calls each).
 export async function refreshFacts(env, deps = {}, max = 2) {
   const f = deps.fetch || fetch, now = (deps.now || Date.now)();
-  const rows = (await env.DB.prepare('SELECT p.slug, p.repo, x.at FROM products p LEFT JOIN facts x ON x.slug = p.slug ORDER BY COALESCE(x.at, 0) ASC LIMIT ?').bind(max).all()).results || [];
+  const rows = (await env.DB.prepare('SELECT p.slug, p.repo, x.at, x.json FROM products p LEFT JOIN facts x ON x.slug = p.slug ORDER BY (CASE WHEN x.json LIKE \'%"trendshift"%\' THEN 1 ELSE 0 END), COALESCE(x.at, 0) ASC LIMIT ?').bind(max).all()).results || [];
   let n = 0;
   for (const p of rows) {
-    if (p.at && now - p.at < 6 * 36e5) continue;
+    if (p.at && now - p.at < 6 * 36e5 && String(p.json).includes('"trendshift"')) continue;
     const j = await fetchFacts(p.repo, { fetch: f, env, now });
+    j.trendshift = await fetchTrendshift(p.repo, { fetch: f }).catch(() => null);
     await env.DB.prepare('INSERT OR REPLACE INTO facts (slug, json, at) VALUES (?,?,?)').bind(p.slug, JSON.stringify(j), now).run();
     n++;
   }
