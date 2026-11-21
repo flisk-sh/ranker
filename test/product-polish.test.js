@@ -38,5 +38,7 @@ test('the product page links to Flisk Grow with the product filled in', () => {
 
 test('the action buttons carry icons', () => {
   const html = product({ slug: 'a-b', repo: 'a/b', name: 'b', tagline: 'x', topics: '', homepage: 'https://b.dev' }, { rank: 1, stars: 1, forks: 0, gain: 0 }, 'https://ranker.flisk.si', [], [], {}, [], null);
-  for (const t of ['Visit', 'View on GitHub', 'Compare', 'Make my grow plan', 'Scanned: CI health']) expect(html).toMatch(new RegExp('</svg>' + t));
+  for (const t of ['Visit', 'View on GitHub', 'Compare', 'Make my grow plan', 'Scanned: CI health']) expect(html).toMatch(new RegExp('(</svg>|">)' + t));
+  expect(html).toContain('google.com/s2/favicons?domain=b.dev');
+  for (const c of ['#15803d', '#0b6b3a', '#03040B']) expect(html).toContain(c);
 });
