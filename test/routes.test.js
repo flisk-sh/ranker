@@ -26,7 +26,7 @@ test('submit imports the repo, lists it and serves its badge', async () => {
   const r = await t.post('/api/submit', { url: 'https://github.com/acme/run' });
   expect(r.status).toBe(200);
   expect((await r.json()).slug).toBe('acme-run');
-  const page = await (await t.call('/p/acme-run')).text();
+  const page = await (await t.call('/acme/run')).text();
   expect(page).toContain('Check my README');
   const b = await t.call('/badge/acme-run.svg');
   expect(b.headers.get('content-type')).toContain('image/svg+xml');
@@ -176,7 +176,7 @@ test('ingest needs the key and saves today\'s snapshot', async () => {
 test('the product page links to the Cilytics scan of its repo', async () => {
   const t = setup({ 'acme/run': { stars: 10 } });
   await t.post('/api/submit', { url: 'https://github.com/acme/run' });
-  const html = await (await t.call('/p/acme-run')).text();
+  const html = await (await t.call('/acme/run')).text();
   expect(html).toContain('https://cilytics.flisk.si/?repo=acme/run');
   expect(html).toContain('Scanned: CI health + GEL guards');
 });
@@ -184,7 +184,7 @@ test('the product page links to the Cilytics scan of its repo', async () => {
 test('the product page scans the repo in the browser for an OSS score and GEL guards', async () => {
   const t = setup({ 'acme/run': { stars: 10 } });
   await t.post('/api/submit', { url: 'https://github.com/acme/run' });
-  const html = await (await t.call('/p/acme-run')).text();
+  const html = await (await t.call('/Acme/Run')).text();
   expect(html).toContain('id="oss"');
   expect(html).toContain('https://cilytics.flisk.si/scan.mjs');
   expect(html).toContain('"acme/run"');
@@ -203,9 +203,9 @@ test('awesome lists are left out of the home list unless asked', async () => {
   await t.post('/api/submit', { url: 'https://github.com/sindresorhus/awesome' });
   await t.post('/api/submit', { url: 'https://github.com/acme/run' });
   const def = await (await t.call('/')).text(), all = await (await t.call('/?awesome=1')).text();
-  expect(def).not.toContain('/p/sindresorhus-awesome');
-  expect(def).toContain('/p/acme-run');
-  expect(all).toContain('/p/sindresorhus-awesome');
+  expect(def).not.toContain('/sindresorhus/awesome');
+  expect(def).toContain('/acme/run');
+  expect(all).toContain('/sindresorhus/awesome');
 });
 
 test('/api/mentions answers with no mentions', async () => {
@@ -237,4 +237,14 @@ test('search filters cover the whole catalog, not only the rendered rows', async
   expect(r.html).toContain('acme-run');
   expect((await (await t.call('/api/search?min=1000')).json()).n).toBe(1);
   expect((await (await t.call('/api/search')).json()).n).toBe(0);
+});
+
+test('old /p/<slug> links move to the GitHub-style /<owner>/<repo> page', async () => {
+  const t = setup({ 'acme/run': { stars: 10 } });
+  await t.post('/api/submit', { url: 'https://github.com/acme/run' });
+  const r = await t.call('/p/acme-run');
+  expect(r.status).toBe(301);
+  expect(r.headers.get('location')).toBe('/acme/run');
+  expect((await t.call('/api/mentions?limit=1')).status).toBe(200);
+  expect((await t.call('/nobody/here')).status).toBe(404);
 });

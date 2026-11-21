@@ -83,10 +83,10 @@ export function badgeSvg({ rank = 0, stars = 0, period = 'daily', size = 'large'
 }
 
 // The snippets a maker pastes into a README.
-export function embed(origin, slug, { size = 'large', period = 'daily', scope } = {}) {
+export function embed(origin, slug, { size = 'large', period = 'daily', scope, repo } = {}) {
   const q = [period !== 'daily' && `period=${period}`, scope === 'language' && 'scope=language', size === 'small' && 'size=small'].filter(Boolean).join('&');
   const img = `${origin}/badge/${slug}.svg${q ? '?' + q : ''}`;
-  const page = `${origin}/p/${slug}`;
+  const page = repo ? `${origin}/${repo}` : `${origin}/p/${slug}`;
   const h = size === 'small' ? 20 : 55;
   return {
     markdown: `[![Flisk Ranker](${img})](${page})`,
