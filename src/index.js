@@ -51,7 +51,7 @@ async function summary(env, slug, rank) {
   const p = await env.DB.prepare('SELECT * FROM products WHERE slug = ?').bind(slug).first();
   const sn = await env.DB.prepare('SELECT stars FROM snapshots WHERE slug = ? ORDER BY day DESC LIMIT 1').bind(slug).first();
   const terms = [...new Set([p.name, ...phrasesOf(p)].map((x) => String(x || '').toLowerCase()).filter(Boolean))];
-  return { slug, url: `/p/${slug}`, product: { name: p.name, tagline: p.tagline, license: p.license, language: p.language, topics: p.topics, repo: p.repo, homepage: p.homepage, stars: sn?.stars || 0, verified: !!p.verified }, terms };
+  return { slug, url: `/${p.repo}`, product: { name: p.name, tagline: p.tagline, license: p.license, language: p.language, topics: p.topics, repo: p.repo, homepage: p.homepage, stars: sn?.stars || 0, verified: !!p.verified }, terms };
 }
 
 async function submitProduct(req, env, deps) {
@@ -188,10 +188,16 @@ export async function handle(req, env, deps = {}) {
     return svg(badgeSvg({ rank: row.rank, stars: row.stars, period, size, day: today }));
   }
 
+  // Old /p/<slug> links (badges already in READMEs) move to the GitHub-style /<owner>/<repo>.
   m = /^\/p\/([a-z0-9-]+)$/.exec(path);
   if (m) {
-    const d = await load(env, today);
-    const p = d.products.find((x) => x.slug === m[1]);
+    const p = await env.DB.prepare('SELECT repo FROM products WHERE slug = ?').bind(m[1]).first();
+    if (p?.repo) return new Response(null, { status: 301, headers: { location: '/' + p.repo, 'cache-control': 'public, max-age=86400' } });
+  }
+  m = /^\/p\/([a-z0-9-]+)$/.exec(path) || (!/^\/(api|badge|p)\//.test(path) && /^\/([\w.-]+\/[\w.-]+)$/.exec(path));
+  if (m && !/^\/(compare|live|submit|badges)$/.test(path)) {
+    const d = await load(env, today), want = m[1].toLowerCase();
+    const p = d.products.find((x) => x.slug === want || String(x.repo || '').toLowerCase() === want);
     if (!p) return html(page.shell('Not found', '<h1>Not listed.</h1><p class="sub"><a href="/submit" style="text-decoration:underline">Submit it</a>.</p>'), 404);
     return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), await rankExtras(d, p, today, Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank]))), d.mentions.filter((m) => m.slug === p.slug), d.facts[p.slug]));
   }
