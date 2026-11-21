@@ -156,10 +156,17 @@ export function achv(p, row, snaps = []) {
 // Flisk Grow fills its box from ?url= and a person presses the button; the product's site beats its repo.
 export const growPlan = (p) => 'https://grow.flisk.si/?url=' + encodeURIComponent(p.homepage || 'https://github.com/' + p.repo);
 
-// Trendshift badges the repo earned, each with the date it was first earned (read from Trendshift).
-export function trendshiftBadges(t) {
-  if (!t?.items?.length || !/^\d+$/.test(String(t.id))) return '';
-  return `<div class="lbl" style="margin-top:18px">TRENDSHIFT</div>${t.items.map((a) => `<p style="margin:12px 0 0"><a href="https://trendshift.io/repositories/${esc(t.id)}#achievements" rel="nofollow"><img src="${esc(a.src)}" width="250" height="55" alt="${esc(a.alt)}" loading="lazy"></a><br><small>First achieved ${esc(a.when)} for ${esc(a.lang)}</small></p>`).join('')}`;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dateLabel = (day) => { const d = new Date(`${day}T00:00:00Z`); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+const NAMES = { daily: 'Day', weekly: 'Week', monthly: 'Month' };
+
+// Our own badges: the best rank the product reached, drawn by the Ranker badge, with the day it was first reached.
+export function earnedBadges(won = [], p = {}) {
+  return won.map((w) => {
+    const svg = badgeSvg({ rank: w.rank, stars: w.stars, period: w.period, day: w.day, lang: w.scope === 'language' ? p.language : undefined });
+    const name = `#${w.rank} ${w.scope === 'language' ? esc(p.language) + ' ' : ''}Repository Of The ${NAMES[w.period]}`;
+    return `<p style="margin:14px 0 0"><img src="data:image/svg+xml,${encodeURIComponent(svg)}" width="250" height="55" alt="${name}" loading="lazy"><br><small>${name} &middot; first achieved ${dateLabel(w.day)}</small></p>`;
+  }).join('');
 }
 
 // The Cilytics page that scans one repo live (CI health plus GEL's workflow guards).
@@ -172,7 +179,7 @@ function ossScript(repo) {
   return `(async function(){var b=document.getElementById('oss'),R=${JSON.stringify(repo)},E=function(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};try{var m=await import('https://cilytics.flisk.si/scan.mjs'),g={};await Promise.all(m.LIVE_GUARDS.map(async function(n){try{g[n]=await import(${JSON.stringify(GEL_BASE)}+'guards/'+n+'/index.mjs')}catch(e){}}));var J=async function(p){var r=await fetch('https://api.github.com'+p,{headers:{Accept:'application/vnd.github+json'}});if(!r.ok)throw new Error(r.status);return r.json()},T=async function(u){return (await fetch(u)).text()};var d=await m.scanRepo(R,{json:J,text:T,guards:g}),r=d.repos[0],o=r.oss,gs=r.gel.guards||[],c=o.score>=80?'#4ade80':o.score>=50?'#ffc94d':'#ff6b6b';b.innerHTML='<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:baseline"><span><b style="font-size:30px;color:'+c+'">'+o.score+'</b><span class="mono"> /100 OSS</span></span><span><b style="font-size:30px">'+gs.filter(function(x){return x.pass}).length+'/'+gs.length+'</b><span class="mono"> GEL guards</span></span></div><div style="margin-top:8px">'+o.checks.map(function(k){return (k.pass?'&#10003; ':'&middot; ')+E(k.label)}).join(' &nbsp; ')+'</div><div style="margin-top:8px">'+gs.map(function(x){return (x.pass?'&#10003; ':'&#10007; ')+E(x.guard)+(x.findings?' ('+x.findings+')':'')}).join(' &nbsp; ')+'</div>'}catch(e){b.innerHTML=(String(e.message||e)==='403'?'GitHub is rate-limiting scans from this browser right now. ':'The live scan is not available right now. ')+'<a href="'+${JSON.stringify(cilytics(repo))}+'" rel="nofollow">Open the full scan &#8599;</a>'}})()`;
 }
 
-export function product(p, row, origin, snaps = [], all = [], ranks = {}, ments = [], fx = null) {
+export function product(p, row, origin, snaps = [], all = [], ranks = {}, ments = [], fx = null, won = []) {
   const rank = row?.rank || 0, stars = row?.stars || 0;
   const alts = all.filter((r) => r.slug !== p.slug).sort((a, b) => (b.language === p.language) - (a.language === p.language)).slice(0, 4);
   const body = `<div style="padding:24px 0 8px"><span class="lbl"><a href="/">TRENDING</a> / ${esc(p.repo)}</span></div>
@@ -186,7 +193,7 @@ ${snaps.filter((x) => x.slug === p.slug).length > 1 ? `<div class="card" style="
 <div class="b"><div class="card"><div class="lbl">YOUR BADGE, LIVE</div><p style="margin:14px 0 8px"><img src="/badge/${esc(p.slug)}.svg" width="250" height="55" alt="Flisk Ranker badge"></p><p style="font-size:13px;color:#9AA0AA;margin:12px 0">${rank ? `#${rank} today, ${RANKS[rankOf(rank)]}. ${BODIES[bodyOf(stars)]} with ${short(stars)} stars.` : 'Not ranked yet.'}</p>${p.verified ? '<span class="ok">Verified: the badge is in the README.</span>' : '<small>Not verified yet. Put the badge in your README, then press the button.</small><br><br><button id="v">Check my README</button> <small id="vm"></small>'}</div>${embedBox(origin, p.slug, p.language, p.repo)}
 <div class="card"><div class="lbl">OSS SCORE &middot; GEL GUARDS</div><div id="oss" style="margin:12px 0 0;font-size:13px;line-height:1.7;color:#9AA0AA">Scanning this repo...</div></div>
 <div class="card"><div class="lbl">WHAT WE SCANNED</div><p style="font-size:13px;line-height:1.6;color:#9AA0AA;margin:12px 0">Stars and forks, every day. Open the CI scan to see its red workflows, flaky runs and GEL guard results, read live from GitHub.</p><a class="btn" href="${cilytics(p.repo)}" rel="nofollow">Open in Cilytics</a></div>
-<div class="card"><div class="lbl">ACHIEVEMENTS</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">${achv(p, row, snaps).map((a) => `<span class="pill ok">${esc(a)}</span>`).join('') || (fx?.trendshift?.items?.length ? '' : '<small>None yet. They come with stars and rank.</small>')}</div>${trendshiftBadges(fx?.trendshift)}</div>${alts.length ? `<div class="card"><div class="lbl">ALTERNATIVES</div>${alts.map((r) => `<div style="display:flex;gap:10px;align-items:center;padding-top:12px">${mark(r, 30)}<a href="${esc(pageOf(r))}">${esc(r.name)}</a><span style="flex:1"></span><span class="lbl">${short(r.stars)} &#9733;</span></div>`).join('')}</div>` : ''}</div></div>`;
+<div class="card"><div class="lbl">ACHIEVEMENTS</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">${achv(p, row, snaps).map((a) => `<span class="pill ok">${esc(a)}</span>`).join('') || (won.length ? '' : '<small>None yet. They come with stars and rank.</small>')}</div>${earnedBadges(won, p)}</div>${alts.length ? `<div class="card"><div class="lbl">ALTERNATIVES</div>${alts.map((r) => `<div style="display:flex;gap:10px;align-items:center;padding-top:12px">${mark(r, 30)}<a href="${esc(pageOf(r))}">${esc(r.name)}</a><span style="flex:1"></span><span class="lbl">${short(r.stars)} &#9733;</span></div>`).join('')}</div>` : ''}</div></div>`;
   const script = ossScript(p.repo) + ';' + (p.verified ? '' : `document.getElementById('v').onclick=async()=>{const m=document.getElementById('vm');m.textContent='Checking...';const r=await fetch('/api/verify/${esc(p.slug)}',{method:'POST'}).then(r=>r.json()).catch(()=>({}));m.textContent=r.verified?'Verified.':'Badge not found in the README yet.';if(r.verified)location.reload()}`);
   return shell(`${p.name} on Ranker`, body, { desc: p.tagline || undefined, script });
 }

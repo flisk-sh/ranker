@@ -1,10 +1,9 @@
 // Flisk Ranker Worker: routes plus the hourly snapshot job.
 import { parseRepo, resolveLink, slugOf, fetchRepo, hasBadge, fetchFacts } from './github.js';
-import { trending, withoutAwesome, PERIODS, dayOf } from './score.js';
+import { trending, earned, withoutAwesome, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
 import { authRoute, userOf } from './auth.js';
-import { fetchTrendshift } from './trendshift.js';
 import { refreshMentions, pulse, phrasesOf } from './mentions.js';
 import { withSecurityHeaders } from './security-headers.js';
 
@@ -200,7 +199,7 @@ export async function handle(req, env, deps = {}) {
     const d = await load(env, today), want = m[1].toLowerCase();
     const p = d.products.find((x) => x.slug === want || String(x.repo || '').toLowerCase() === want);
     if (!p) return html(page.shell('Not found', '<h1>Not listed.</h1><p class="sub"><a href="/submit" style="text-decoration:underline">Submit it</a>.</p>'), 404);
-    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), await rankExtras(d, p, today, Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank]))), d.mentions.filter((m) => m.slug === p.slug), d.facts[p.slug]));
+    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), await rankExtras(d, p, today, Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank]))), d.mentions.filter((m) => m.slug === p.slug), d.facts[p.slug], earned(p, d.products, d.snaps, today)));
   }
 
   if (path === '/compare') {
@@ -245,7 +244,6 @@ export async function refreshFacts(env, deps = {}, max = 2) {
   for (const p of rows) {
     if (p.at && now - p.at < 6 * 36e5) continue;
     const j = await fetchFacts(p.repo, { fetch: f, env, now });
-    j.trendshift = await fetchTrendshift(p.repo, { fetch: f }).catch(() => null);
     await env.DB.prepare('INSERT OR REPLACE INTO facts (slug, json, at) VALUES (?,?,?)').bind(p.slug, JSON.stringify(j), now).run();
     n++;
   }
