@@ -4,6 +4,7 @@ import { trending, withoutAwesome, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
 import { authRoute, userOf } from './auth.js';
+import { fetchTrendshift } from './trendshift.js';
 import { refreshMentions, pulse, phrasesOf } from './mentions.js';
 import { withSecurityHeaders } from './security-headers.js';
 
@@ -244,6 +245,7 @@ export async function refreshFacts(env, deps = {}, max = 2) {
   for (const p of rows) {
     if (p.at && now - p.at < 6 * 36e5) continue;
     const j = await fetchFacts(p.repo, { fetch: f, env, now });
+    j.trendshift = await fetchTrendshift(p.repo, { fetch: f }).catch(() => null);
     await env.DB.prepare('INSERT OR REPLACE INTO facts (slug, json, at) VALUES (?,?,?)').bind(p.slug, JSON.stringify(j), now).run();
     n++;
   }
