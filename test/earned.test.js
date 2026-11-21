@@ -37,3 +37,14 @@ test('ranker star milestones carry the day each was first reached', () => {
   const s = [{ slug: 's', day: '2026-10-01', stars: 90 }, { slug: 's', day: '2026-10-05', stars: 101 }];
   expect(achv({ slug: 's' }, { stars: 101, rank: 50 }, s)).toEqual(['100 stars · first achieved 2026-10-05']);
 });
+
+import { listedBadges } from '../src/page.js';
+test('listed rankings are drawn as Ranker badges with the first-achieved date, no outside image', () => {
+  const t = { id: '7', items: [{ period: 'daily', lang: 'Starlark', when: 'on 30th, Sep 2026', src: 'https://trendshift.io/x', alt: '#1 Starlark Repository Of The Day' }] };
+  const h = listedBadges(t, 54);
+  expect(h).toContain('data:image/svg+xml');
+  expect(decodeURIComponent(h.match(/svg\+xml,([^"]+)"/)[1])).toContain('TRENDING · STARLARK');
+  expect(h).toContain('#1 Starlark Repository Of The Day &middot; first achieved 30th, Sep 2026');
+  expect(h).not.toContain('trendshift');
+  expect(listedBadges(null)).toBe('');
+});
