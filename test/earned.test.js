@@ -48,3 +48,10 @@ test('listed rankings are drawn as Ranker badges with the first-achieved date, n
   expect(h).not.toContain('trendshift');
   expect(listedBadges(null)).toBe('');
 });
+
+test('long listed badge title shrinks to fit instead of being clipped', async () => {
+  const { badgeSvg } = await import('../src/badge.js');
+  const svg = badgeSvg({ rank: 1, period: 'daily', label: '#1 Starlark Repository Of The Day', kicker: 'TRENDING · STARLARK' });
+  expect(svg).not.toContain('clip-path="url(#b)"');
+  expect(svg).toMatch(/font-size="1[01]\.\d+"[^>]*>#1 Starlark Repository Of The Day/);
+});
