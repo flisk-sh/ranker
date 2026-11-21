@@ -25,3 +25,13 @@ test('a product page without scan data shows no placeholder cards and balanced m
   const close = (html.match(/<\/div>/g) || []).length;
   expect(close).toBe(count('div'));
 });
+
+test('the product page links to Flisk Grow with the product filled in', () => {
+  const base = { slug: 'a-b', repo: 'a/b', name: 'b', tagline: 'x', topics: '' };
+  const row = { rank: 1, stars: 1, forks: 0, gain: 0 };
+  const repoLink = product(base, row, 'https://ranker.flisk.si', [], [], {}, [], null);
+  expect(repoLink).toContain('Make my grow plan');
+  expect(repoLink).toContain('https://grow.flisk.si/?url=https%3A%2F%2Fgithub.com%2Fa%2Fb');
+  const site = product({ ...base, homepage: 'https://b.dev' }, row, 'https://ranker.flisk.si', [], [], {}, [], null);
+  expect(site).toContain('https://grow.flisk.si/?url=https%3A%2F%2Fb.dev');
+});
