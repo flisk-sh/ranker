@@ -35,3 +35,8 @@ test('the product page links to Flisk Grow with the product filled in', () => {
   const site = product({ ...base, homepage: 'https://b.dev' }, row, 'https://ranker.flisk.si', [], [], {}, [], null);
   expect(site).toContain('https://grow.flisk.si/?url=https%3A%2F%2Fb.dev');
 });
+
+test('the action buttons carry icons', () => {
+  const html = product({ slug: 'a-b', repo: 'a/b', name: 'b', tagline: 'x', topics: '', homepage: 'https://b.dev' }, { rank: 1, stars: 1, forks: 0, gain: 0 }, 'https://ranker.flisk.si', [], [], {}, [], null);
+  for (const t of ['Visit', 'View on GitHub', 'Compare', 'Make my grow plan', 'Scanned: CI health']) expect(html).toMatch(new RegExp('</svg>' + t));
+});
