@@ -8,14 +8,20 @@ for (const [d, a, b, c] of [['2026-10-01', 10, 10, 10], ['2026-10-02', 30, 20, 5
   snaps.push({ slug: 'a', day: d, stars: a }, { slug: 'b', day: d, stars: b }, { slug: 'c', day: d, stars: c });
 
 test('earned finds the first day a product reached its best rank, overall and in its language', () => {
-  const w = earned(prods[0], prods, snaps, '2026-10-03');
+  const w = earned(prods[0], prods, snaps, '2026-10-03', { minField: 1 });
   const day = w.find((x) => x.period === 'daily' && x.scope === 'language');
   expect(day).toMatchObject({ rank: 1, day: '2026-10-02' });
   expect(w.find((x) => x.period === 'daily' && x.scope === 'all')).toMatchObject({ rank: 1, day: '2026-10-03' });
 });
 
+test('earned needs a full period of history and enough products', () => {
+  expect(earned(prods[0], prods, snaps, '2026-10-03')).toEqual([]);
+  const w = earned(prods[0], prods, snaps, '2026-10-03', { minField: 1 });
+  expect(w.some((x) => x.period === 'weekly')).toBe(false);
+});
+
 test('earned skips products that gained nothing or rank below the top', () => {
-  expect(earned(prods[1], prods, snaps, '2026-10-03', { top: 1 })).toEqual([]);
+  expect(earned(prods[1], prods, snaps, '2026-10-03', { top: 1, minField: 1 })).toEqual([]);
 });
 
 test('earnedBadges draws our own Ranker badge with the date, never a Trendshift image', () => {
