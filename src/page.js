@@ -140,12 +140,16 @@ function heat(snaps, slug) {
   const m = Math.max(1, ...g);
   return `<div class="heat" style="margin-top:14px">${g.map((n) => `<i style="background:${n ? `rgba(91,228,155,${(.25 + .75 * n / m).toFixed(2)})` : '#12151A'}"></i>`).join('')}</div>`;
 }
-function achv(p, row) {
+export function achv(p, row, snaps = []) {
   const a = [], st = row?.stars || 0;
   if (p.verified) a.push('Verified by the maker');
   if (row && row.rank <= 10) a.push('Top 10 today');
   if (row && row.rank === 1) a.push('Product of the day');
-  for (const n of [100, 1000, 10000, 100000]) if (st >= n) a.push(short(n) + ' stars');
+  const mine = snaps.filter((x) => x.slug === p.slug).sort((x, y) => (x.day < y.day ? -1 : 1));
+  for (const n of [100, 1000, 10000, 100000]) if (st >= n) {
+    const d = mine.find((x) => x.stars >= n)?.day;
+    a.push(short(n) + ' stars' + (d ? ` \u00b7 first achieved ${d}` : ''));
+  }
   return a;
 }
 
@@ -182,7 +186,7 @@ ${snaps.filter((x) => x.slug === p.slug).length > 1 ? `<div class="card" style="
 <div class="b"><div class="card"><div class="lbl">YOUR BADGE, LIVE</div><p style="margin:14px 0 8px"><img src="/badge/${esc(p.slug)}.svg" width="250" height="55" alt="Flisk Ranker badge"></p><p style="font-size:13px;color:#9AA0AA;margin:12px 0">${rank ? `#${rank} today, ${RANKS[rankOf(rank)]}. ${BODIES[bodyOf(stars)]} with ${short(stars)} stars.` : 'Not ranked yet.'}</p>${p.verified ? '<span class="ok">Verified: the badge is in the README.</span>' : '<small>Not verified yet. Put the badge in your README, then press the button.</small><br><br><button id="v">Check my README</button> <small id="vm"></small>'}</div>${embedBox(origin, p.slug, p.language, p.repo)}
 <div class="card"><div class="lbl">OSS SCORE &middot; GEL GUARDS</div><div id="oss" style="margin:12px 0 0;font-size:13px;line-height:1.7;color:#9AA0AA">Scanning this repo...</div></div>
 <div class="card"><div class="lbl">WHAT WE SCANNED</div><p style="font-size:13px;line-height:1.6;color:#9AA0AA;margin:12px 0">Stars and forks, every day. Open the CI scan to see its red workflows, flaky runs and GEL guard results, read live from GitHub.</p><a class="btn" href="${cilytics(p.repo)}" rel="nofollow">Open in Cilytics</a></div>
-<div class="card"><div class="lbl">ACHIEVEMENTS</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">${achv(p, row).map((a) => `<span class="pill ok">${esc(a)}</span>`).join('') || (fx?.trendshift?.items?.length ? '' : '<small>None yet. They come with stars and rank.</small>')}</div>${trendshiftBadges(fx?.trendshift)}</div>${alts.length ? `<div class="card"><div class="lbl">ALTERNATIVES</div>${alts.map((r) => `<div style="display:flex;gap:10px;align-items:center;padding-top:12px">${mark(r, 30)}<a href="${esc(pageOf(r))}">${esc(r.name)}</a><span style="flex:1"></span><span class="lbl">${short(r.stars)} &#9733;</span></div>`).join('')}</div>` : ''}</div></div>`;
+<div class="card"><div class="lbl">ACHIEVEMENTS</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">${achv(p, row, snaps).map((a) => `<span class="pill ok">${esc(a)}</span>`).join('') || (fx?.trendshift?.items?.length ? '' : '<small>None yet. They come with stars and rank.</small>')}</div>${trendshiftBadges(fx?.trendshift)}</div>${alts.length ? `<div class="card"><div class="lbl">ALTERNATIVES</div>${alts.map((r) => `<div style="display:flex;gap:10px;align-items:center;padding-top:12px">${mark(r, 30)}<a href="${esc(pageOf(r))}">${esc(r.name)}</a><span style="flex:1"></span><span class="lbl">${short(r.stars)} &#9733;</span></div>`).join('')}</div>` : ''}</div></div>`;
   const script = ossScript(p.repo) + ';' + (p.verified ? '' : `document.getElementById('v').onclick=async()=>{const m=document.getElementById('vm');m.textContent='Checking...';const r=await fetch('/api/verify/${esc(p.slug)}',{method:'POST'}).then(r=>r.json()).catch(()=>({}));m.textContent=r.verified?'Verified.':'Badge not found in the README yet.';if(r.verified)location.reload()}`);
   return shell(`${p.name} on Ranker`, body, { desc: p.tagline || undefined, script });
 }

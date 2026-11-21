@@ -35,3 +35,9 @@ test('trendshiftBadges shows the badge and the date, and escapes', () => {
   expect(trendshiftBadges(null)).toBe('');
   expect(trendshiftBadges({ id: 'x"', items: [{}] })).toBe('');
 });
+
+import { achv } from '../src/page.js';
+test('ranker achievements carry the day each star milestone was first reached', () => {
+  const snaps = [{ slug: 's', day: '2026-10-01', stars: 90 }, { slug: 's', day: '2026-10-05', stars: 101 }, { slug: 's', day: '2026-10-06', stars: 120 }];
+  expect(achv({ slug: 's' }, { stars: 120, rank: 50 }, snaps)).toEqual(['100 stars · first achieved 2026-10-05']);
+});
