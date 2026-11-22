@@ -25,7 +25,7 @@ export async function fetchRepo(repo, { fetch: f = fetch, env } = {}) {
   return {
     repo: j.full_name || repo,
     name: j.name,
-    tagline: String(j.description || '').slice(0, 200),
+    tagline: clip(String(j.description || '').trim(), 200),
     homepage: /^https?:\/\//.test(j.homepage || '') ? j.homepage : '',
     license: j.license?.spdx_id && j.license.spdx_id !== 'NOASSERTION' ? j.license.spdx_id : '',
     language: j.language || '',
@@ -81,4 +81,11 @@ export async function resolveLink(input, { fetch: f = fetch } = {}) {
     if (r?.ok) return find((await r.text().catch(() => '')).slice(0, 400000));
   }
   return '';
+}
+
+// Cut at a word, not mid-word, and say so.
+function clip(s, n) {
+  if (s.length <= n) return s;
+  const c = s.slice(0, n - 1), i = c.lastIndexOf(' ');
+  return (i > n * 0.6 ? c.slice(0, i) : c).replace(/[\s,;:.-]+$/, '') + '\u2026';
 }
