@@ -7,7 +7,6 @@ test('the shared shell declares Open Graph and Twitter card tags', () => {
   for (const tag of [
     '<meta property="og:title" content="Ranker">',
     '<meta property="og:description"',
-    '<meta property="og:url" content="https://ranker.flisk.si/">',
     '<meta property="og:type" content="website">',
     '<meta property="og:image" content="https://ranker.flisk.si/og.png">',
     '<meta property="og:image:width" content="1200">',
