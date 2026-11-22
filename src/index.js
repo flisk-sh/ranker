@@ -7,6 +7,7 @@ import { authRoute, userOf } from './auth.js';
 import { fetchTrendshift } from './trendshift.js';
 import { refreshMentions, pulse, phrasesOf } from './mentions.js';
 import { withSecurityHeaders } from './security-headers.js';
+import { OG_PNG } from './og.js';
 import { appleTouchIcon } from './apple-touch-icon.js';
 
 const mk = (s, status, who) => new Response(s.replace('<!--USER-->', page.userBox(who)), { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, max-age=0' } });
@@ -170,6 +171,7 @@ export async function handle(req, env, deps = {}) {
   if (path === '/health') return json({ ok: true });
   if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n', { headers: { 'content-type': 'text/plain', 'cache-control': 'public, max-age=86400' } });
   if (path === '/icon.svg') return svg(page.ICON);
+  if (path === '/og.png') return new Response(OG_PNG, { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=31536000, immutable' } });
   if (path === '/apple-touch-icon.png') return new Response(appleTouchIcon, { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=31536000, immutable' } });
   if (path === '/favicon.ico') return new Response(null, { status: 308, headers: { location: '/icon.svg', 'cache-control': 'public, max-age=86400' } });
   if (path === '/llms.txt') return new Response('# Flisk Ranker\nProducts ranked by stars gained on GitHub, with live README badges.\n- /badge/<slug>.svg?period=daily|weekly|monthly|yearly&size=large|small\n- /api/trending?period=daily\n', { headers: { 'content-type': 'text/plain' } });
