@@ -1,15 +1,31 @@
 // Flisk Ranker Worker: routes plus the hourly snapshot job.
 import { parseRepo, resolveLink, slugOf, fetchRepo, hasBadge, fetchFacts } from './github.js';
-import { trending, withoutAwesome, PERIODS, dayOf } from './score.js';
+import { trending, earned, withoutAwesome, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
 import { authRoute, userOf } from './auth.js';
+import { fetchTrendshift } from './trendshift.js';
 import { refreshMentions, pulse, phrasesOf } from './mentions.js';
 import { withSecurityHeaders } from './security-headers.js';
 
 const mk = (s, status, who) => new Response(s.replace('<!--USER-->', page.userBox(who)), { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, max-age=0' } });
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
 const svg = (s) => new Response(s, { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'public, max-age=300' } });
+
+async function cachedResponse(request, body, contentType, cacheControl) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body));
+  const etag = '"' + Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('') + '"';
+  const headers = { 'content-type': contentType, 'cache-control': cacheControl, etag };
+  const candidates = request.headers.get('if-none-match')?.split(',') ?? [];
+  const matches = candidates.some((candidate) => {
+    const tag = candidate.trim();
+    return tag === '*' || tag.replace(/^W\//, '') === etag;
+  });
+  if (matches && (request.method === 'GET' || request.method === 'HEAD')) {
+    return new Response(null, { status: 304, headers });
+  }
+  return new Response(request.method === 'HEAD' ? null : body, { headers });
+}
 
 // The catalog only changes hourly (snapshot job) or on a submit, so keep one copy per isolate for a minute.
 // Without this every page view re-read four whole tables and used 3M of the 5M free D1 rows a day.
@@ -51,7 +67,7 @@ async function summary(env, slug, rank) {
   const p = await env.DB.prepare('SELECT * FROM products WHERE slug = ?').bind(slug).first();
   const sn = await env.DB.prepare('SELECT stars FROM snapshots WHERE slug = ? ORDER BY day DESC LIMIT 1').bind(slug).first();
   const terms = [...new Set([p.name, ...phrasesOf(p)].map((x) => String(x || '').toLowerCase()).filter(Boolean))];
-  return { slug, url: `/p/${slug}`, product: { name: p.name, tagline: p.tagline, license: p.license, language: p.language, topics: p.topics, repo: p.repo, homepage: p.homepage, stars: sn?.stars || 0, verified: !!p.verified }, terms };
+  return { slug, url: `/${p.repo}`, product: { name: p.name, tagline: p.tagline, license: p.license, language: p.language, topics: p.topics, repo: p.repo, homepage: p.homepage, stars: sn?.stars || 0, verified: !!p.verified }, terms };
 }
 
 async function submitProduct(req, env, deps) {
@@ -151,8 +167,9 @@ export async function handle(req, env, deps = {}) {
     return json(r?.ok ? ((await r.json()).data || []) : { error: 'Hourly history did not answer.' }, r?.ok ? 200 : 502);
   }
   if (path === '/health') return json({ ok: true });
-  if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n', { headers: { 'content-type': 'text/plain' } });
+  if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n', { headers: { 'content-type': 'text/plain', 'cache-control': 'public, max-age=86400' } });
   if (path === '/icon.svg') return svg(page.ICON);
+  if (path === '/favicon.ico') return new Response(null, { status: 308, headers: { location: '/icon.svg', 'cache-control': 'public, max-age=86400' } });
   if (path === '/llms.txt') return new Response('# Flisk Ranker\nProducts ranked by stars gained on GitHub, with live README badges.\n- /badge/<slug>.svg?period=daily|weekly|monthly|yearly&size=large|small\n- /api/trending?period=daily\n', { headers: { 'content-type': 'text/plain' } });
 
   if (req.method === 'POST' && path === '/api/submit') return submitProduct(req, env, deps);
@@ -170,7 +187,9 @@ export async function handle(req, env, deps = {}) {
   if (path === '/api/trending') {
     if (asked !== null && !known) return json({ error: 'period must be daily, weekly, monthly or yearly' }, 400);
     const d = await load(env, today);
-    return json((u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today))).slice(0, 100).map(({ slug, name, repo, stars, gain, rank, verified }) => ({ rank, slug, name, repo, stars, gain, verified: !!verified, period })));
+    const rows = (u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today))).slice(0, 100);
+    const body = JSON.stringify(rows.map(({ slug, name, repo, stars, gain, rank, verified }) => ({ rank, slug, name, repo, stars, gain, verified: !!verified, period })));
+    return cachedResponse(req, body, 'application/json; charset=utf-8', 'public, max-age=300, stale-while-revalidate=600');
   }
 
   m = /^\/badge\/([a-z0-9-]+)\.svg$/.exec(path);
@@ -187,12 +206,18 @@ export async function handle(req, env, deps = {}) {
     return svg(badgeSvg({ rank: row.rank, stars: row.stars, period, size, day: today }));
   }
 
+  // Old /p/<slug> links (badges already in READMEs) move to the GitHub-style /<owner>/<repo>.
   m = /^\/p\/([a-z0-9-]+)$/.exec(path);
   if (m) {
-    const d = await load(env, today);
-    const p = d.products.find((x) => x.slug === m[1]);
+    const p = await env.DB.prepare('SELECT repo FROM products WHERE slug = ?').bind(m[1]).first();
+    if (p?.repo) return new Response(null, { status: 301, headers: { location: '/' + p.repo, 'cache-control': 'public, max-age=86400' } });
+  }
+  m = /^\/p\/([a-z0-9-]+)$/.exec(path) || (!/^\/(api|badge|p)\//.test(path) && /^\/([\w.-]+\/[\w.-]+)$/.exec(path));
+  if (m && !/^\/(compare|live|submit|badges)$/.test(path)) {
+    const d = await load(env, today), want = m[1].toLowerCase();
+    const p = d.products.find((x) => x.slug === want || String(x.repo || '').toLowerCase() === want);
     if (!p) return html(page.shell('Not found', '<h1>Not listed.</h1><p class="sub"><a href="/submit" style="text-decoration:underline">Submit it</a>.</p>'), 404);
-    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), await rankExtras(d, p, today, Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank]))), d.mentions.filter((m) => m.slug === p.slug), d.facts[p.slug]));
+    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), await rankExtras(d, p, today, Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank]))), d.mentions.filter((m) => m.slug === p.slug), d.facts[p.slug], earned(p, d.products, d.snaps, today)));
   }
 
   if (path === '/compare') {
@@ -210,8 +235,20 @@ export async function handle(req, env, deps = {}) {
   if (path === '/live') return (async () => { const d = await load(env, today); return html(page.live(ranked(d, 'daily', today), d.mentions)); })();
   if (path === '/submit') return html(page.submit(who));
   if (path === '/badges') { const d = await load(env, today); return html(page.badges(ranked(d, 'daily', today), origin)); }
-  if (path === '/') { const d = await load(env, today); return html(page.home(u.searchParams.get('awesome') === '1' ? ranked(d, period, today) : withoutAwesome(ranked(d, period, today)), period, d.snaps, d.mentions, u.searchParams.get('awesome') === '1')); }
-  return html(page.shell('Not found', '<h1>Not found.</h1>'), 404);
+  if (path === '/') {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      return new Response('Method Not Allowed', { status: 405, headers: { allow: 'GET, HEAD' } });
+    }
+    const d = await load(env, today);
+    const includeAwesome = u.searchParams.get('awesome') === '1';
+    const rows = ranked(d, period, today);
+    const response = html(page.home(includeAwesome ? rows : withoutAwesome(rows), period, d.snaps, d.mentions, includeAwesome));
+    return req.method === 'HEAD' ? new Response(null, response) : response;
+  }
+  return new Response(
+    '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Not found | Ranker</title></head><body><main><h1>Not found.</h1><p><a href="/">Back to Ranker</a></p></main></body></html>',
+    { status: 404, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, max-age=0' } },
+  );
 }
 
 // Hourly: at most 40 products a run (the free plan allows 50 outside calls), the ones without today's snapshot first.
@@ -232,11 +269,12 @@ export async function snapshot(env, deps = {}) {
 // Activity facts for the two products checked longest ago (4 outside calls each).
 export async function refreshFacts(env, deps = {}, max = 2) {
   const f = deps.fetch || fetch, now = (deps.now || Date.now)();
-  const rows = (await env.DB.prepare('SELECT p.slug, p.repo, x.at FROM products p LEFT JOIN facts x ON x.slug = p.slug ORDER BY COALESCE(x.at, 0) ASC LIMIT ?').bind(max).all()).results || [];
+  const rows = (await env.DB.prepare('SELECT p.slug, p.repo, x.at, x.json FROM products p LEFT JOIN facts x ON x.slug = p.slug ORDER BY (CASE WHEN x.json LIKE \'%"trendshift"%\' THEN 1 ELSE 0 END), COALESCE(x.at, 0) ASC LIMIT ?').bind(max).all()).results || [];
   let n = 0;
   for (const p of rows) {
-    if (p.at && now - p.at < 6 * 36e5) continue;
+    if (p.at && now - p.at < 6 * 36e5 && String(p.json).includes('"trendshift"')) continue;
     const j = await fetchFacts(p.repo, { fetch: f, env, now });
+    j.trendshift = await fetchTrendshift(p.repo, { fetch: f }).catch(() => null);
     await env.DB.prepare('INSERT OR REPLACE INTO facts (slug, json, at) VALUES (?,?,?)').bind(p.slug, JSON.stringify(j), now).run();
     n++;
   }
