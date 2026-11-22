@@ -1,9 +1,10 @@
 // Flisk Ranker Worker: routes plus the hourly snapshot job.
 import { parseRepo, resolveLink, slugOf, fetchRepo, hasBadge, fetchFacts } from './github.js';
-import { trending, withoutAwesome, PERIODS, dayOf } from './score.js';
+import { trending, earned, withoutAwesome, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
 import { authRoute, userOf } from './auth.js';
+import { fetchTrendshift } from './trendshift.js';
 import { refreshMentions, pulse, phrasesOf } from './mentions.js';
 import { withSecurityHeaders } from './security-headers.js';
 
@@ -51,7 +52,7 @@ async function summary(env, slug, rank) {
   const p = await env.DB.prepare('SELECT * FROM products WHERE slug = ?').bind(slug).first();
   const sn = await env.DB.prepare('SELECT stars FROM snapshots WHERE slug = ? ORDER BY day DESC LIMIT 1').bind(slug).first();
   const terms = [...new Set([p.name, ...phrasesOf(p)].map((x) => String(x || '').toLowerCase()).filter(Boolean))];
-  return { slug, url: `/p/${slug}`, product: { name: p.name, tagline: p.tagline, license: p.license, language: p.language, topics: p.topics, repo: p.repo, homepage: p.homepage, stars: sn?.stars || 0, verified: !!p.verified }, terms };
+  return { slug, url: `/${p.repo}`, product: { name: p.name, tagline: p.tagline, license: p.license, language: p.language, topics: p.topics, repo: p.repo, homepage: p.homepage, stars: sn?.stars || 0, verified: !!p.verified }, terms };
 }
 
 async function submitProduct(req, env, deps) {
@@ -188,12 +189,18 @@ export async function handle(req, env, deps = {}) {
     return svg(badgeSvg({ rank: row.rank, stars: row.stars, period, size, day: today }));
   }
 
+  // Old /p/<slug> links (badges already in READMEs) move to the GitHub-style /<owner>/<repo>.
   m = /^\/p\/([a-z0-9-]+)$/.exec(path);
   if (m) {
-    const d = await load(env, today);
-    const p = d.products.find((x) => x.slug === m[1]);
+    const p = await env.DB.prepare('SELECT repo FROM products WHERE slug = ?').bind(m[1]).first();
+    if (p?.repo) return new Response(null, { status: 301, headers: { location: '/' + p.repo, 'cache-control': 'public, max-age=86400' } });
+  }
+  m = /^\/p\/([a-z0-9-]+)$/.exec(path) || (!/^\/(api|badge|p)\//.test(path) && /^\/([\w.-]+\/[\w.-]+)$/.exec(path));
+  if (m && !/^\/(compare|live|submit|badges)$/.test(path)) {
+    const d = await load(env, today), want = m[1].toLowerCase();
+    const p = d.products.find((x) => x.slug === want || String(x.repo || '').toLowerCase() === want);
     if (!p) return html(page.shell('Not found', '<h1>Not listed.</h1><p class="sub"><a href="/submit" style="text-decoration:underline">Submit it</a>.</p>'), 404);
-    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), await rankExtras(d, p, today, Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank]))), d.mentions.filter((m) => m.slug === p.slug), d.facts[p.slug]));
+    return html(page.product(p, ranked(d, 'daily', today).find((r) => r.slug === p.slug), origin, d.snaps, ranked(d, 'daily', today), await rankExtras(d, p, today, Object.fromEntries(Object.keys(PERIODS).map((k) => [k, ranked(d, k, today).find((r) => r.slug === p.slug)?.rank]))), d.mentions.filter((m) => m.slug === p.slug), d.facts[p.slug], earned(p, d.products, d.snaps, today)));
   }
 
   if (path === '/compare') {
@@ -233,11 +240,12 @@ export async function snapshot(env, deps = {}) {
 // Activity facts for the two products checked longest ago (4 outside calls each).
 export async function refreshFacts(env, deps = {}, max = 2) {
   const f = deps.fetch || fetch, now = (deps.now || Date.now)();
-  const rows = (await env.DB.prepare('SELECT p.slug, p.repo, x.at FROM products p LEFT JOIN facts x ON x.slug = p.slug ORDER BY COALESCE(x.at, 0) ASC LIMIT ?').bind(max).all()).results || [];
+  const rows = (await env.DB.prepare('SELECT p.slug, p.repo, x.at, x.json FROM products p LEFT JOIN facts x ON x.slug = p.slug ORDER BY (CASE WHEN x.json LIKE \'%"trendshift"%\' THEN 1 ELSE 0 END), COALESCE(x.at, 0) ASC LIMIT ?').bind(max).all()).results || [];
   let n = 0;
   for (const p of rows) {
-    if (p.at && now - p.at < 6 * 36e5) continue;
+    if (p.at && now - p.at < 6 * 36e5 && String(p.json).includes('"trendshift"')) continue;
     const j = await fetchFacts(p.repo, { fetch: f, env, now });
+    j.trendshift = await fetchTrendshift(p.repo, { fetch: f }).catch(() => null);
     await env.DB.prepare('INSERT OR REPLACE INTO facts (slug, json, at) VALUES (?,?,?)').bind(p.slug, JSON.stringify(j), now).run();
     n++;
   }
