@@ -245,7 +245,10 @@ export async function handle(req, env, deps = {}) {
     const response = html(page.home(includeAwesome ? rows : withoutAwesome(rows), period, d.snaps, d.mentions, includeAwesome));
     return req.method === 'HEAD' ? new Response(null, response) : response;
   }
-  return html(page.shell('Not found', '<h1>Not found.</h1>'), 404);
+  return new Response(
+    '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Not found | Ranker</title></head><body><main><h1>Not found.</h1><p><a href="/">Back to Ranker</a></p></main></body></html>',
+    { status: 404, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, max-age=0' } },
+  );
 }
 
 // Hourly: at most 40 products a run (the free plan allows 50 outside calls), the ones without today's snapshot first.
