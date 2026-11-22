@@ -54,7 +54,7 @@ const STARS = [[70, 9, 0.8, 3], [118, 47, 0.7, 2.4], [176, 8, 0.8, 3.6], [205, 4
 const twinkle = (x, y, r, d, i) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff"><animate attributeName="opacity" values="1;.1;1" dur="${d}s" begin="-${f2(i * 0.4)}s" repeatCount="indefinite"/></circle>`;
 
 // input: { rank, stars, period, label? }. Returns the SVG text.
-export function badgeSvg({ rank = 0, stars = 0, period = 'daily', size = 'large', label, lang, day } = {}) {
+export function badgeSvg({ rank = 0, stars = 0, period = 'daily', size = 'large', label, lang, day, kicker } = {}) {
   const r = bodyOf(stars), c = rankOf(rank), m = METAL[Math.floor(c / 5)];
   const when = whenOf(period, day);
   const scope = lang || 'all languages';
@@ -72,21 +72,26 @@ export function badgeSvg({ rank = 0, stars = 0, period = 'daily', size = 'large'
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="20" viewBox="0 0 ${w} 20" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><rect x=".5" y=".5" width="${w - 1}" height="19" rx="4" fill="#03040B" stroke="#2f3646"/>${twinkle(34, 5, 0.6, 2, 0)}${twinkle(w - 26, 16, 0.6, 2.5, 1)}${twinkle(60, 15, 0.6, 3, 2)}${star}<text x="23" y="14" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11" fill="#fff"><tspan fill="${m}">ranker</tspan> ${esc(smallMain)}</text>${ch}</svg>`;
   }
   const stars6 = STARS.map(([x, y, rr, d], i) => twinkle(x, y, rr, d, i)).join('');
-  const lab = `STARS GAINED \u00b7 ${scope.toUpperCase()}`;
+  const lab = kicker || `STARS GAINED \u00b7 ${scope.toUpperCase()}`;
   const line = (id, text, est, y, attrs) => {
     const avail = 182, over = est - avail;
     if (over <= 0) return `<text x="62" y="${y}" ${attrs}>${esc(text)}</text>`;
     const d = f2(over + 8), dur = f2(4 + d / 18);
     return `<clipPath id="${id}"><rect x="62" y="${y - 16}" width="${avail}" height="22"/></clipPath><g clip-path="url(#${id})"><text x="62" y="${y}" ${attrs}>${esc(text)}<animateTransform attributeName="transform" type="translate" values="0 0;0 0;-${d} 0;-${d} 0;0 0" keyTimes="0;.15;.6;.8;1" dur="${dur}s" repeatCount="indefinite"/></text></g>`;
   };
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="55" viewBox="0 0 250 55" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><rect x=".5" y=".5" width="249" height="54" rx="10" fill="#03040B" stroke="#2f3646"/>${stars6}<g transform="translate(2 1.5) scale(2)">${figure(r, c)}</g>${line('a', lab, lab.length * 6.4, 21, `font-family="ui-monospace,Menlo,monospace" font-size="9" letter-spacing=".6" fill="${m}"`)}${line('b', main, main.length * 8.2, 40, 'font-family="Inter,system-ui,sans-serif" font-size="16" font-weight="500" fill="#fff"')}</svg>`;
+  const fitLine = (text) => {
+    const est = text.length * 8.2, fs = est > 182 ? Math.max(10.5, f2(16 * 182 / est)) : 16;
+    const attrs = `font-family="Inter,system-ui,sans-serif" font-size="${fs}" font-weight="500" fill="#fff"`;
+    return line('b', text, text.length * 0.51 * fs, 40, attrs);
+  };
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="55" viewBox="0 0 250 55" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><rect x=".5" y=".5" width="249" height="54" rx="10" fill="#03040B" stroke="#2f3646"/>${stars6}<g transform="translate(2 1.5) scale(2)">${figure(r, c)}</g>${line('a', lab, lab.length * 6.4, 21, `font-family="ui-monospace,Menlo,monospace" font-size="9" letter-spacing=".6" fill="${m}"`)}${fitLine(main)}</svg>`;
 }
 
 // The snippets a maker pastes into a README.
-export function embed(origin, slug, { size = 'large', period = 'daily', scope } = {}) {
+export function embed(origin, slug, { size = 'large', period = 'daily', scope, repo } = {}) {
   const q = [period !== 'daily' && `period=${period}`, scope === 'language' && 'scope=language', size === 'small' && 'size=small'].filter(Boolean).join('&');
   const img = `${origin}/badge/${slug}.svg${q ? '?' + q : ''}`;
-  const page = `${origin}/p/${slug}`;
+  const page = repo ? `${origin}/${repo}` : `${origin}/p/${slug}`;
   const h = size === 'small' ? 20 : 55;
   return {
     markdown: `[![Flisk Ranker](${img})](${page})`,
