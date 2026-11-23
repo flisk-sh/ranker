@@ -72,7 +72,7 @@ export const mark = (r, n = 44) => {
 };
 
 export function userBox(who) {
-  return who ? `<a class="me" href="/logout" title="Sign out">${esc(who)} &middot; signed in</a>` : '<a class="cta" href="/login">Sign in with GitHub</a>';
+  return who ? `<a class="me" href="/logout" title="Sign out"><span data-flisk-login>${esc(who)}</span> &middot; signed in</a>` : '<a class="cta" href="/login">Sign in with GitHub</a>';
 }
 
 
