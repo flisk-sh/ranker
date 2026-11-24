@@ -49,3 +49,11 @@ test('a website is verified when its page carries the badge', async () => {
   await t2.post('/api/submit', { url: 'https://getaiatlas.com/' });
   expect((await (await t2.post('/api/verify/site-getaiatlas-com')).json()).verified).toBe(true);
 });
+
+test('the submit page script is valid JavaScript', async () => {
+  const t = setup();
+  const html = await (await t.call('/submit')).text();
+  const scripts = [...html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  expect(scripts.length).toBeGreaterThan(0);
+  for (const code of scripts) expect(() => new Function(code)).not.toThrow();
+});
