@@ -1,5 +1,5 @@
 // Flisk Ranker Worker: routes plus the hourly snapshot job.
-import { parseRepo, resolveLink, slugOf, fetchRepo, hasBadge, fetchFacts } from './github.js';
+import { parseRepo, resolveLink, slugOf, fetchRepo, hasBadge, fetchFacts, isSite, siteOf, fetchSite, hasSiteBadge } from './github.js';
 import { trending, earned, withoutAwesome, PERIODS, dayOf } from './score.js';
 import { badgeSvg } from './badge.js';
 import * as page from './page.js';
@@ -74,16 +74,22 @@ async function summary(env, slug, rank) {
 
 async function submitProduct(req, env, deps) {
   const body = await req.json().catch(() => ({}));
-  const repo = await resolveLink(body.url, { fetch: deps.fetch });
-  if (!repo) return json({ error: 'No GitHub repo found at that link. Paste a GitHub, npm, PyPI or website link that points to one.' }, 400);
-  const slug = slugOf(repo);
+  let repo = await resolveLink(body.url, { fetch: deps.fetch });
+  // No GitHub repo behind the link: a plain website is listed as a website-only product.
+  const host = repo ? '' : siteOf(body.url);
+  if (!repo && !host) return json({ error: 'No GitHub repo or website found at that link. Paste a GitHub, npm, PyPI or website link.' }, 400);
+  if (host) repo = `site/${host}`;
+  let slug = slugOf(repo);
   const old = await env.DB.prepare('SELECT slug FROM products WHERE slug = ?').bind(slug).first();
   if (old) return json(await summary(env, slug));
   const today = dayOf(deps.now());
   const cap = Number(env.SUBMITS_PER_DAY || 100);
   const used = (await env.DB.prepare('SELECT n FROM days WHERE day = ?').bind(today).first())?.n || 0;
   if (used >= cap) return json({ error: 'Many people submitted today. Try again tomorrow.' }, 429);
-  const r = await fetchRepo(repo, { fetch: deps.fetch, env });
+  let r = host ? await fetchSite(host, { fetch: deps.fetch }) : await fetchRepo(repo, { fetch: deps.fetch, env });
+  // A website that only links to someone else's missing repo is still a website product.
+  const fallback = !host && r.error && !parseRepo(body.url) ? siteOf(body.url) : '';
+  if (fallback) { repo = `site/${fallback}`; slug = slugOf(repo); r = await fetchSite(fallback, { fetch: deps.fetch }); }
   if (r.error) return json({ error: r.error }, 422);
   await env.DB.batch([
     env.DB.prepare('INSERT OR IGNORE INTO products (slug, repo, name, tagline, homepage, license, language, topics, verified, created) VALUES (?,?,?,?,?,?,?,?,0,?)').bind(slug, r.repo, r.name, r.tagline, r.homepage, r.license, r.language, r.topics, deps.now()),
@@ -180,9 +186,9 @@ export async function handle(req, env, deps = {}) {
 
   let m = /^\/api\/verify\/([a-z0-9-]+)$/.exec(path);
   if (req.method === 'POST' && m) {
-    const p = await env.DB.prepare('SELECT slug, repo FROM products WHERE slug = ?').bind(m[1]).first();
+    const p = await env.DB.prepare('SELECT slug, repo, homepage FROM products WHERE slug = ?').bind(m[1]).first();
     if (!p) return json({ error: 'Not listed.' }, 404);
-    const ok = await hasBadge(p.repo, p.slug, { fetch: deps.fetch, origin });
+    const ok = isSite(p.repo) ? await hasSiteBadge(p.homepage, p.slug, { fetch: deps.fetch, origin }) : await hasBadge(p.repo, p.slug, { fetch: deps.fetch, origin });
     if (ok) await env.DB.prepare('UPDATE products SET verified = 1 WHERE slug = ?').bind(p.slug).run();
     dropLoadCache(env);
     return json({ verified: ok });
@@ -262,6 +268,7 @@ export async function snapshot(env, deps = {}) {
   const todo = (await env.DB.prepare('SELECT p.slug, p.repo, p.verified FROM products p WHERE NOT EXISTS (SELECT 1 FROM snapshots s WHERE s.slug = p.slug AND s.day = ?) LIMIT 28').bind(today).all()).results || [];
   let done = 0;
   for (const p of todo) {
+    if (isSite(p.repo)) { await env.DB.prepare('INSERT OR REPLACE INTO snapshots (slug, day, stars, forks) VALUES (?,?,0,0)').bind(p.slug, today).run(); continue; }
     const r = await fetchRepo(p.repo, { fetch: deps.fetch, env });
     if (r.error) continue;
     await env.DB.prepare('INSERT OR REPLACE INTO snapshots (slug, day, stars, forks) VALUES (?,?,?,?)').bind(p.slug, today, r.stars, r.forks).run();
@@ -273,7 +280,7 @@ export async function snapshot(env, deps = {}) {
 // Activity facts for the two products checked longest ago (4 outside calls each).
 export async function refreshFacts(env, deps = {}, max = 2) {
   const f = deps.fetch || fetch, now = (deps.now || Date.now)();
-  const rows = (await env.DB.prepare('SELECT p.slug, p.repo, x.at, x.json FROM products p LEFT JOIN facts x ON x.slug = p.slug ORDER BY (CASE WHEN x.json LIKE \'%"trendshift"%\' THEN 1 ELSE 0 END), COALESCE(x.at, 0) ASC LIMIT ?').bind(max).all()).results || [];
+  const rows = (await env.DB.prepare('SELECT p.slug, p.repo, x.at, x.json FROM products p LEFT JOIN facts x ON x.slug = p.slug WHERE p.repo NOT LIKE \'site/%\' ORDER BY (CASE WHEN x.json LIKE \'%"trendshift"%\' THEN 1 ELSE 0 END), COALESCE(x.at, 0) ASC LIMIT ?').bind(max).all()).results || [];
   let n = 0;
   for (const p of rows) {
     if (p.at && now - p.at < 6 * 36e5 && String(p.json).includes('"trendshift"')) continue;
