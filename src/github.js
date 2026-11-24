@@ -83,6 +83,40 @@ export async function resolveLink(input, { fetch: f = fetch } = {}) {
   return '';
 }
 
+// Website-only products (no public GitHub repo) are stored under "site/<host>", so every URL, slug and
+// lookup that works for "owner/repo" works for them too. They have no stars; GitHub is never asked about them.
+export const isSite = (repo) => String(repo || '').startsWith('site/');
+const NOT_SITE = /\b(localhost|producthunt\.com|github\.com)\b/i;
+export function siteOf(input) {
+  try {
+    const u = new URL(String(input || '').trim());
+    const h = u.hostname.toLowerCase().replace(/^www\./, '');
+    if (!/^https?:$/.test(u.protocol) || !/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(h) || NOT_SITE.test(h)) return '';
+    return h;
+  } catch { return ''; }
+}
+const decodeEntities = (s) => s.replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013').replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))).replace(/&#x27;|&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+const meta = (html, re) => { const m = re.exec(html); return m ? decodeEntities(m[1]).trim() : ''; };
+const attr = (html, key) => meta(html, new RegExp(`<meta[^>]+(?:property|name)=["']${key}["'][^>]*content=["']([^"']*)["']`, 'i')) || meta(html, new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]*(?:property|name)=["']${key}["']`, 'i'));
+
+// Same shape as fetchRepo, read from the site's own page: name, line and homepage; stars stay 0.
+export async function fetchSite(host, { fetch: f = fetch } = {}) {
+  const homepage = `https://${host}/`;
+  const r = await f(homepage, { headers: { 'user-agent': 'flisk-ranker' }, redirect: 'follow' }).catch(() => null);
+  if (!r?.ok) return { error: 'That website did not answer. Try again in a minute.' };
+  const html = (await r.text().catch(() => '')).slice(0, 200000);
+  const title = attr(html, 'og:site_name') || meta(html, /<title[^>]*>([^<]*)<\/title>/i).split(/\s+[\u2014\u2013|:-]\s+/)[0] || host;
+  const line = attr(html, 'og:description') || attr(html, 'description');
+  return { repo: `site/${host}`, name: clip(title, 80), tagline: clip(line, 200), homepage, license: '', language: '', topics: '', stars: 0, forks: 0 };
+}
+
+// True when the site's home page carries this product's Ranker badge.
+export async function hasSiteBadge(homepage, slug, { fetch: f = fetch, origin = 'https://ranker.flisk.si' } = {}) {
+  const r = await f(homepage, { headers: { 'user-agent': 'flisk-ranker' } }).catch(() => null);
+  if (!r?.ok) return false;
+  return (await r.text().catch(() => '')).includes(`${new URL(origin).host}/badge/${slug}.svg`);
+}
+
 // Cut at a word, not mid-word, and say so.
 function clip(s, n) {
   if (s.length <= n) return s;
