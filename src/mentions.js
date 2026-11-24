@@ -11,7 +11,7 @@ async function getJson(f, url) {
 
 export async function searchHN(q, since, f) {
   const j = await getJson(f, `https://hn.algolia.com/api/v1/search_by_date?query=${encodeURIComponent(q)}&tags=(story,comment)&hitsPerPage=30&typoTolerance=false&numericFilters=created_at_i>${Math.floor(since / 1000)}`);
-  return (j?.hits || []).map((h) => ({ source: 'Hacker News', url: `https://news.ycombinator.com/item?id=${h.objectID}`, text: clip(h.title || h.story_title ? `${h.title || h.story_title} ${h.comment_text || ''}` : h.comment_text || h.story_text, 400), author: clip(h.author, 60), at: (h.created_at_i || 0) * 1000 }));
+  return (j?.hits || []).map((h) => ({ source: 'Hacker News', url: `https://news.ycombinator.com/item?id=${h.objectID}`, text: clip([h.title || h.story_title, h.comment_text || h.story_text].filter(Boolean).join(' '), 400), author: clip(h.author, 60), at: (h.created_at_i || 0) * 1000 }));
 }
 
 export async function searchBluesky(q, since, f) {

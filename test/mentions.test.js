@@ -27,6 +27,19 @@ test('refresh stores real hits, skips near misses, and waits an hour', async () 
   expect(r.results).toEqual([{ source: 'Hacker News', author: 'bob' }]);
 });
 
+test('refresh finds mentions in titled Hacker News story bodies', async () => {
+  const env = { DB: fakeD1() };
+  await env.DB.prepare("INSERT INTO products (slug, repo, name, created) VALUES ('acme-run','acme/run','run',1)").run();
+  const now = Date.UTC(2026, 10, 16, 12);
+  const fetch = async (url) => Response.json(url.includes('algolia')
+    ? { hits: [{ objectID: '3', title: 'Show HN: My new tool', story_text: 'The code is at acme/run.', created_at_i: now / 1000 - 60 }] }
+    : { posts: [] });
+
+  expect(await refreshMentions(env, { fetch, now: () => now })).toBe(1);
+  const { results } = await env.DB.prepare('SELECT text FROM mentions').all();
+  expect(results).toEqual([{ text: 'Show HN: My new tool The code is at acme/run.' }]);
+});
+
 import { searchHN } from '../src/mentions.js';
 test('decodes HTML entities in Hacker News text', async () => {
   const f = async () => ({ ok: true, json: async () => ({ hits: [{ objectID: '1', title: 'Show HN: x', comment_text: 'run npx @flisk-sh&amp;#x2F;flisk &#x27;demo&#x27;', created_at_i: 1 }] }) });
