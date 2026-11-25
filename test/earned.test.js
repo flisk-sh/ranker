@@ -20,6 +20,15 @@ test('earned needs a full period of history and enough products', () => {
   expect(w.some((x) => x.period === 'weekly')).toBe(false);
 });
 
+test('a language badge needs enough ranked products in that language', () => {
+  const awards = earned(prods[0], prods, snaps, '2026-10-03', { minField: 3 });
+  expect(awards).toEqual([{ period: 'daily', scope: 'all', rank: 1, day: '2026-10-03', stars: 60 }]);
+
+  const enoughGoProducts = [...prods.slice(0, 2), { ...prods[2], language: 'Go' }];
+  expect(earned(enoughGoProducts[0], enoughGoProducts, snaps, '2026-10-03', { minField: 3 }))
+    .toContainEqual({ period: 'daily', scope: 'language', rank: 1, day: '2026-10-03', stars: 60 });
+});
+
 test('earned skips products that gained nothing or rank below the top', () => {
   expect(earned(prods[1], prods, snaps, '2026-10-03', { top: 1, minField: 1 })).toEqual([]);
 });

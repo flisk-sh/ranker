@@ -36,7 +36,8 @@ export const isAwesome = (p) => /(^|[\/-])awesome(-|$)/i.test(`${p.repo || ''} $
 export function withoutAwesome(rows) { return rows.filter((r) => !isAwesome(r)).map((r, i) => ({ ...r, rank: i + 1 })); }
 
 // Own achievements: the best rank (top 10 or better) a product reached in each period, overall and in its
-// language, and the first day it reached it. A badge needs a full period of history and a field of minField products. Counts products ahead instead of sorting, so it stays cheap.
+// language, and the first day it reached it. A badge needs a full period of history and at least
+// minField ranked products in its scope. Counts products ahead instead of sorting, so it stays cheap.
 export function earned(p, products, snaps, today = dayOf(), { top = 10, days = 90, minField = 10 } = {}) {
   const from = addDays(today, -(days + 30)), by = new Map();
   for (const s of snaps) if (s.day >= from) (by.get(s.slug) || by.set(s.slug, []).get(s.slug)).push(s);
@@ -58,9 +59,11 @@ export function earned(p, products, snaps, today = dayOf(), { top = 10, days = 9
       rows.push({ slug: l.slug, lang: l.lang, gain: last.stars - base.stars, stars: last.stars });
     }
     const me = rows.find((r) => r.slug === p.slug);
-    if (!me || me.gain <= 0 || rows.length < minField) continue;
+    if (!me || me.gain <= 0) continue;
     for (const scope of p.language ? ['all', 'language'] : ['all']) {
-      const rank = 1 + rows.filter((r) => (scope === 'all' || r.lang === p.language) && (r.gain > me.gain || (r.gain === me.gain && (r.stars > me.stars || (r.stars === me.stars && r.slug < me.slug))))).length;
+      const field = scope === 'all' ? rows : rows.filter((r) => r.lang === p.language);
+      if (field.length < minField) continue;
+      const rank = 1 + field.filter((r) => r.gain > me.gain || (r.gain === me.gain && (r.stars > me.stars || (r.stars === me.stars && r.slug < me.slug)))).length;
       const k = `${period}-${scope}`;
       if (rank <= top && (!best[k] || rank < best[k].rank)) best[k] = { period, scope, rank, day, stars: me.stars };
     }
