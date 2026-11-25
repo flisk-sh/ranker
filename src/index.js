@@ -29,10 +29,11 @@ async function cachedResponse(request, body, contentType, cacheControl) {
   return new Response(request.method === 'HEAD' ? null : body, { headers });
 }
 
-// The catalog only changes hourly (snapshot job) or on a submit, so keep one copy per isolate for a minute.
+// The catalog only changes hourly (snapshot job) or on a submit, so keep one copy per isolate for ten minutes.
+// A minute was not enough: isolates are short-lived, and the snapshots read alone (about 6.7k rows) ran ~500 times a day, 3.4M of the 5M free rows.
 // Without this every page view re-read four whole tables and used 3M of the 5M free D1 rows a day.
 const memo = new WeakMap();
-const TTL = 60000;
+const TTL = 10 * 60000;
 export const dropLoadCache = (env) => memo.delete(env.DB);
 async function load(env, today) {
   const hit = memo.get(env.DB);
