@@ -34,12 +34,20 @@ async function cachedResponse(request, body, contentType, cacheControl) {
 // Without this every page view re-read four whole tables and used 3M of the 5M free D1 rows a day.
 const memo = new WeakMap();
 const TTL = 10 * 60000;
-export const dropLoadCache = (env) => memo.delete(env.DB);
+// The isolate copy dies with the isolate, so a second copy lives in the colo's shared Cache API: one D1 read of the catalog
+// per ten minutes per colo, not per isolate. Tests and local runs have no `caches`, and then only the isolate copy is used.
+const SHARED = 'https://ranker.flisk.si/__catalog';
+const shared = () => (typeof caches !== 'undefined' ? caches.default : null);
+export const dropLoadCache = (env) => { memo.delete(env.DB); shared()?.delete(SHARED).catch(() => {}); };
 async function load(env, today) {
   const hit = memo.get(env.DB);
   if (hit && hit.today === today && Date.now() - hit.t < TTL) return hit.v;
+  const cache = shared();
+  const edge = cache && await cache.match(SHARED).then((r) => r && r.json()).catch(() => null);
+  if (edge && edge.today === today) { memo.set(env.DB, { t: Date.now(), today, v: edge.v }); return edge.v; }
   const v = await loadFresh(env, today);
   memo.set(env.DB, { t: Date.now(), today, v });
+  if (cache) cache.put(SHARED, new Response(JSON.stringify({ today, v }), { headers: { 'cache-control': 'public, max-age=' + TTL / 1000 } })).catch(() => {});
   return v;
 }
 async function loadFresh(env, today) {
