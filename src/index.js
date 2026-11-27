@@ -29,13 +29,13 @@ async function cachedResponse(request, body, contentType, cacheControl) {
   return new Response(request.method === 'HEAD' ? null : body, { headers });
 }
 
-// The catalog only changes hourly (snapshot job) or on a submit, so keep one copy per isolate for ten minutes.
+// The catalog only changes hourly (snapshot job) or on a submit, so keep one copy per isolate for an hour.
 // A minute was not enough: isolates are short-lived, and the snapshots read alone (about 6.7k rows) ran ~500 times a day, 3.4M of the 5M free rows.
 // Without this every page view re-read four whole tables and used 3M of the 5M free D1 rows a day.
 const memo = new WeakMap();
-const TTL = 10 * 60000;
+const TTL = 60 * 60000;
 // The isolate copy dies with the isolate, so a second copy lives in the colo's shared Cache API: one D1 read of the catalog
-// per ten minutes per colo, not per isolate. Tests and local runs have no `caches`, and then only the isolate copy is used.
+// per hour per colo, not per isolate. Tests and local runs have no `caches`, and then only the isolate copy is used.
 const SHARED = 'https://ranker.flisk.si/__catalog';
 const shared = () => (typeof caches !== 'undefined' ? caches.default : null);
 export const dropLoadCache = (env) => { memo.delete(env.DB); shared()?.delete(SHARED).catch(() => {}); };
@@ -307,7 +307,6 @@ export async function tick(env, deps = {}) {
   const r = await env.DB.prepare('INSERT OR IGNORE INTO days (day, n) VALUES (?, 1)').bind('run-' + hour).run();
   if (!r.meta?.changes) return 0;
   const n = await snapshot(env, deps);
-  dropLoadCache(env);
   await refreshMentions(env, deps, 6).catch(() => 0);
   await refreshFacts(env, deps).catch(() => 0);
   dropLoadCache(env);
