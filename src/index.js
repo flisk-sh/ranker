@@ -184,7 +184,15 @@ export async function handle(req, env, deps = {}) {
     return json(r?.ok ? ((await r.json()).data || []) : { error: 'Hourly history did not answer.' }, r?.ok ? 200 : 502);
   }
   if (path === '/health') return json({ ok: true });
-  if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n', { headers: { 'content-type': 'text/plain', 'cache-control': 'public, max-age=86400' } });
+  if (path === '/robots.txt') return new Response('User-agent: *\nAllow: /\n\nSitemap: https://ranker.flisk.si/sitemap.xml\n', { headers: { 'content-type': 'text/plain', 'cache-control': 'public, max-age=86400' } });
+  if (path === '/sitemap.xml') {
+    // One query, capped so a large catalog cannot blow the Worker response.
+    const rows = await env.DB.prepare('SELECT repo FROM products ORDER BY created DESC LIMIT 5000').all();
+    const urls = ['/', '/submit', '/badges', ...(rows.results || []).map((r) => '/' + r.repo)];
+    const xml = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+      + urls.map((u) => `<url><loc>https://ranker.flisk.si${u}</loc></url>`).join('') + '</urlset>';
+    return new Response(xml, { headers: { 'content-type': 'application/xml', 'cache-control': 'public, max-age=86400' } });
+  }
   if (path === '/icon.svg') return svg(page.ICON);
   if (path === '/og.png') return new Response(OG_PNG, { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=31536000, immutable' } });
   if (path === '/apple-touch-icon.png') return new Response(appleTouchIcon, { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=31536000, immutable' } });
